@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TESUJI UI Mockup A - Liquid ID</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, "Noto Sans Thai", "Segoe UI", sans-serif;
+      color: #f6f8fb;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(22, 163, 184, .18), transparent 32rem),
+        radial-gradient(circle at 80% 12%, rgba(99, 102, 241, .13), transparent 30rem),
+        #07090d;
+    }
+    .phone {
+      width: min(430px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 18px 18px 92px;
+    }
+    header {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+    .mark {
+      width: 34px; height: 34px; border-radius: 12px;
+      display: grid; place-items: center;
+      background: linear-gradient(145deg, rgba(45,212,191,.9), rgba(59,130,246,.72));
+      color: #041014;
+      box-shadow: 0 14px 38px rgba(45,212,191,.22);
+    }
+    .icon {
+      width: 38px; height: 38px; border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.055);
+      color: #dbe8f4;
+      display: grid; place-items: center;
+      backdrop-filter: blur(18px);
+    }
+    .hero { margin-top: 18px; }
+    .eyebrow { color: #8fd7dc; font-size: 13px; margin-bottom: 8px; }
+    h1 { margin: 0; font-size: 28px; line-height: 1.18; letter-spacing: 0; }
+    .sub { color: #a8b3c2; margin: 10px 0 0; line-height: 1.6; }
+    .glass {
+      border: 1px solid rgba(255,255,255,.13);
+      background: linear-gradient(160deg, rgba(255,255,255,.105), rgba(255,255,255,.045));
+      box-shadow: 0 22px 70px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
+      backdrop-filter: blur(22px);
+      border-radius: 22px;
+    }
+    .id-card {
+      margin-top: 22px;
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .id-top { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    .qr {
+      width: 108px; aspect-ratio: 1; border-radius: 18px;
+      background:
+        linear-gradient(90deg, #0b1117 12px, transparent 12px) 0 0/24px 24px,
+        linear-gradient(#0b1117 12px, transparent 12px) 0 0/24px 24px,
+        #e9fbff;
+      border: 8px solid rgba(255,255,255,.85);
+      flex: 0 0 auto;
+    }
+    .player { flex: 1; min-width: 0; }
+    .player h2 { margin: 0; font-size: 22px; line-height: 1.2; }
+    .player .en { color: #a8b3c2; margin-top: 4px; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill {
+      min-height: 30px;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.1);
+      color: #dce7ef;
+      font-size: 13px;
+    }
+    .pill.good { color: #9af5d0; background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.22); }
+    .section-title { margin: 26px 0 12px; display: flex; justify-content: space-between; align-items: center; }
+    .section-title h3 { margin: 0; font-size: 16px; }
+    .see { color: #7dd3fc; font-size: 13px; }
+    .tournament {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 74px 1fr;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+    .datebox {
+      height: 74px; border-radius: 18px;
+      background: rgba(125,211,252,.12);
+      display: grid; place-items: center;
+      border: 1px solid rgba(125,211,252,.18);
+      text-align: center;
+    }
+    .datebox strong { display: block; font-size: 24px; }
+    .tournament h4 { margin: 0; font-size: 16px; }
+    .meta { color: #9aa8b8; font-size: 13px; margin-top: 5px; line-height: 1.45; }
+    .progress { height: 7px; border-radius: 99px; background: rgba(255,255,255,.08); margin-top: 12px; overflow: hidden; }
+    .bar { width: 58%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2dd4bf, #60a5fa); }
+    nav {
+      position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+      width: min(398px, calc(100% - 28px)); height: 66px;
+      display: grid; grid-template-columns: repeat(4, 1fr); align-items: center;
+      border-radius: 24px;
+    }
+    nav a { color: #9ba8b8; text-decoration: none; text-align: center; font-size: 12px; }
+    nav b { display: block; color: #eff8ff; font-size: 20px; line-height: 1; margin-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <main class="phone">
+    <header>
+      <div class="brand"><div class="mark">手</div><span>TESUJI</span></div>
+      <div class="icon">🔔</div>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">Digital Player ID</div>
+      <h1>บัตรนักกีฬาหมากล้อม</h1>
+      <p class="sub">ข้อมูลผู้เล่นและสถานะการสมัครล่าสุดในบัญชีของคุณ</p>
+    </section>
+
+    <section class="glass id-card">
+      <div class="id-top">
+        <div class="qr"></div>
+        <div class="player">
+          <h2>สมชาย ใจดี</h2>
+          <div class="en">Somchai Jaidee</div>
+          <div class="pill-row">
+            <span class="pill good">✓ verified</span>
+            <span class="pill">3 Dan</span>
+            <span class="pill">Player</span>
+          </div>
+        </div>
+      </div>
+      <div class="pill-row">
+        <span class="pill">Buddy GO</span>
+        <span class="pill">ID: TSG-1024</span>
+      </div>
+    </section>
+
+    <div class="section-title"><h3>รายการที่เปิดรับสมัคร</h3><span class="see">ดูทั้งหมด</span></div>
+    <section class="glass tournament">
+      <div class="datebox"><div><strong>15</strong><span>ก.ค.</span></div></div>
+      <div>
+        <h4>Thailand Go Open 2569</h4>
+        <div class="meta">กรุงเทพมหานคร · 4 รุ่น · เปิดรับสมัคร</div>
+        <div class="progress"><div class="bar"></div></div>
+      </div>
+    </section>
+    <section class="glass tournament">
+      <div class="datebox"><div><strong>28</strong><span>ส.ค.</span></div></div>
+      <div>
+        <h4>Junior Go Circuit</h4>
+        <div class="meta">Buddy GO · 9x9 / 13x13 · 38/64 คน</div>
+        <div class="progress"><div class="bar" style="width:72%"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="glass">
+    <a href="#"><b>⌂</b>หน้าแรก</a>
+    <a href="#"><b>♙</b>รายการ</a>
+    <a href="#"><b>▦</b>สมัคร</a>
+    <a href="#"><b>☰</b>เพิ่มเติม</a>
+  </nav>
+</body>
+</html>
+

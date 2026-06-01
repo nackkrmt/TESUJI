@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TESUJI UI Mockups</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, "Noto Sans Thai", "Segoe UI", sans-serif;
+      color: #f4f7fb;
+      background: #07090d;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    main { width: min(760px, 100%); }
+    h1 { margin: 0 0 10px; letter-spacing: 0; }
+    p { color: #a7b2c0; line-height: 1.6; margin: 0 0 24px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    a {
+      min-height: 150px;
+      border-radius: 18px;
+      padding: 18px;
+      color: #f4f7fb;
+      text-decoration: none;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.055);
+      backdrop-filter: blur(18px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    b { font-size: 18px; }
+    span { color: #9aa7b6; line-height: 1.5; font-size: 14px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>TESUJI UI Mockups</h1>
+    <p>mood สำหรับ minimal dark liquid glass: mobile ID เด่น, admin operational, mobile minimal, และ dashboard skeuomorphic.</p>
+    <div class="grid">
+      <a href="./option-a-liquid-id.html"><b>Option A</b><span>Liquid ID, premium mobile, glass หนาและมีแสงเย็น</span></a>
+      <a href="./option-b-ops-glass.html"><b>Option B</b><span>Admin/ops, อ่านข้อมูลง่าย, glass น้อยลง</span></a>
+      <a href="./option-c-minimal-mobile.html"><b>Option C</b><span>Minimal mobile, contrast สูง, card เรียบและใช้งานเร็ว</span></a>
+      <a href="./dashboard-dark-skeuo.html"><b>Dashboard</b><span>Dark skeuomorphic neumorphism สำหรับหน้าหลัก</span></a>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TESUJI UI Mockup C - Minimal Mobile</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, "Noto Sans Thai", "Segoe UI", sans-serif;
+      color: #f4f7fb;
+      background: linear-gradient(180deg, #050608 0%, #0a1014 100%);
+    }
+    .app {
+      width: min(430px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 16px 16px 92px;
+    }
+    .top {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 48px; margin-bottom: 10px;
+    }
+    .title { font-size: 15px; color: #aeb8c5; }
+    .round {
+      width: 38px; height: 38px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.055);
+      display: grid; place-items: center;
+      backdrop-filter: blur(18px);
+    }
+    h1 { font-size: 24px; margin: 14px 0 18px; line-height: 1.25; letter-spacing: 0; }
+    .card {
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.055);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 16px 48px rgba(0,0,0,.35);
+    }
+    .id { padding: 16px; }
+    .id-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .person b { display: block; font-size: 20px; }
+    .person span { display: block; color: #9da8b7; margin-top: 4px; font-size: 13px; }
+    .miniqr {
+      width: 72px; aspect-ratio: 1; border-radius: 14px;
+      background:
+        linear-gradient(90deg, #111821 10px, transparent 10px) 0 0/20px 20px,
+        linear-gradient(#111821 10px, transparent 10px) 0 0/20px 20px,
+        #e8fbff;
+      border: 6px solid rgba(255,255,255,.86);
+      flex: 0 0 auto;
+    }
+    .rankline {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      margin-top: 14px;
+    }
+    .metric {
+      min-height: 58px; border-radius: 14px;
+      background: rgba(255,255,255,.055);
+      border: 1px solid rgba(255,255,255,.08);
+      padding: 10px 12px;
+    }
+    .metric span { display: block; color: #94a3b5; font-size: 12px; }
+    .metric b { display: block; margin-top: 5px; font-size: 17px; }
+    .actions {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      margin: 14px 0 22px;
+    }
+    .action {
+      min-height: 72px; padding: 13px;
+      text-decoration: none; color: #eff6fb;
+    }
+    .action span { display: block; color: #9aa7b6; margin-top: 5px; font-size: 12px; }
+    .list-title { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 10px; }
+    .list-title b { font-size: 15px; }
+    .list-title span { color: #6ee7d8; font-size: 13px; }
+    .row {
+      padding: 14px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 10px;
+    }
+    .row b { display: block; font-size: 14px; }
+    .row small { color: #9aa7b6; display: block; margin-top: 5px; line-height: 1.35; }
+    .status {
+      min-width: 76px; text-align: center;
+      padding: 7px 9px; border-radius: 999px; font-size: 12px;
+      border: 1px solid rgba(45,212,191,.22);
+      color: #99f6e4; background: rgba(20,184,166,.1);
+    }
+    .status.wait { color: #fde68a; background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.2); }
+    nav {
+      position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+      width: min(398px, calc(100% - 24px)); height: 62px;
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      align-items: center;
+      border-radius: 18px;
+    }
+    nav a { color: #8895a6; text-decoration: none; text-align: center; font-size: 11px; }
+    nav a.active { color: #f7fbff; }
+    nav b { display: block; font-size: 18px; line-height: 1; margin-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="top">
+      <div class="title">TESUJI</div>
+      <div class="round">🔔</div>
+    </div>
+    <h1>สวัสดี สมชาย<br />พร้อมลงแข่งรายการถัดไป</h1>
+
+    <section class="card id">
+      <div class="id-head">
+        <div class="person">
+          <b>สมชาย ใจดี</b>
+          <span>Somchai Jaidee · Buddy GO</span>
+        </div>
+        <div class="miniqr"></div>
+      </div>
+      <div class="rankline">
+        <div class="metric"><span>ระดับ</span><b>3 Dan</b></div>
+        <div class="metric"><span>สถานะ</span><b>Verified</b></div>
+      </div>
+    </section>
+
+    <section class="actions">
+      <a class="card action" href="#">สมัครแข่ง<span>เลือกรายการที่เปิดรับ</span></a>
+      <a class="card action" href="#">การสมัคร<span>ดูสถานะและชำระเงิน</span></a>
+      <a class="card action" href="#">ผลสด<span>ติดตามรอบล่าสุด</span></a>
+      <a class="card action" href="#">Coach Link<span>จัดการคำขอเชื่อม</span></a>
+    </section>
+
+    <div class="list-title"><b>การสมัครล่าสุด</b><span>ทั้งหมด</span></div>
+    <section class="card row">
+      <div><b>Thailand Go Open 2569</b><small>รุ่น 1-3 Dan · 15 ก.ค.</small></div>
+      <div class="status">ยืนยัน</div>
+    </section>
+    <section class="card row">
+      <div><b>Junior Go Circuit</b><small>9x9 · linked player</small></div>
+      <div class="status wait">รอจ่าย</div>
+    </section>
+  </main>
+
+  <nav class="card">
+    <a class="active" href="#"><b>⌂</b>หน้าแรก</a>
+    <a href="#"><b>♙</b>รายการ</a>
+    <a href="#"><b>▦</b>สมัคร</a>
+    <a href="#"><b>☰</b>เมนู</a>
+  </nav>
+</body>
+</html>
+
