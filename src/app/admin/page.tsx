@@ -7,15 +7,20 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
+import { getCoachRequests } from "@/lib/admin/role-management";
 import { getGoDatabaseSummaries } from "@/lib/go/database-summary";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const summaries = await getGoDatabaseSummaries();
+  const [summaries, coachRequests] = await Promise.all([
+    getGoDatabaseSummaries(),
+    getCoachRequests(),
+  ]);
   const totalImportable = summaries.reduce((sum, item) => sum + item.importableRows, 0);
   const totalSkipped = summaries.reduce((sum, item) => sum + item.skippedRows, 0);
   const readySources = summaries.filter((item) => !item.error && item.importableRows > 0).length;
+  const pendingCoachRequests = coachRequests.filter((request) => request.status === "pending").length;
 
   return (
     <div className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
@@ -56,8 +61,8 @@ export default async function AdminDashboardPage() {
         <OverviewWidget
           icon={<UsersRound className="h-5 w-5" />}
           label="Coach Requests"
-          value="-"
-          detail="รอระบบอนุมัติ Coach"
+          value={pendingCoachRequests.toLocaleString("th-TH")}
+          detail="pending coach approval"
           tone="green"
         />
         <OverviewWidget

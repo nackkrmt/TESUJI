@@ -67,6 +67,7 @@ export async function POST(request: Request) {
       importableRows: parsed.importedRows.length,
       skippedRows: parsed.skippedRows.length,
       supabaseImportedRows: supabaseImport.importedRows,
+      syncedProfiles: supabaseImport.syncedProfiles,
       supabaseStrategy: supabaseImport.strategy,
     });
 
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
       importableRows: parsed.importedRows.length,
       skippedRows: parsed.skippedRows.length,
       supabaseImportedRows: supabaseImport.importedRows,
+      syncedProfiles: supabaseImport.syncedProfiles,
       supabaseStrategy: supabaseImport.strategy,
     });
   } catch (error) {

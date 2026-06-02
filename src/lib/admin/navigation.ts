@@ -1,4 +1,4 @@
-import { Database, Gauge, type LucideIcon } from "lucide-react";
+import { Database, Gauge, ShieldCheck, type LucideIcon } from "lucide-react";
 
 export type AdminNavItem = {
   href: string;
@@ -19,5 +19,11 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Database",
     description: "อัปโหลด DAN / KYU / AWARD / SCHOOL",
     icon: Database,
+  },
+  {
+    href: "/admin/roles",
+    label: "Roles",
+    description: "Coach approval / Referee invites",
+    icon: ShieldCheck,
   },
 ];

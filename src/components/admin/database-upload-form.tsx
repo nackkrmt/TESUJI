@@ -49,6 +49,7 @@ export function DatabaseUploadForm({
         importableRows?: number;
         skippedRows?: number;
         supabaseImportedRows?: number;
+        syncedProfiles?: number;
       };
 
       if (!response.ok || !result.ok) {
@@ -61,7 +62,7 @@ export function DatabaseUploadForm({
 
       setState({
         status: "success",
-        message: `เข้า Supabase แล้ว: ${result.supabaseImportedRows?.toLocaleString("th-TH")} rows, ${result.skippedRows?.toLocaleString("th-TH")} skip`,
+        message: `เข้า Supabase แล้ว: ${result.supabaseImportedRows?.toLocaleString("th-TH")} rows, ${result.skippedRows?.toLocaleString("th-TH")} skip, sync ${result.syncedProfiles?.toLocaleString("th-TH") ?? "0"} profiles`,
       });
       setFileName("");
 

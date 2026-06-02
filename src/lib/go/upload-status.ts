@@ -11,6 +11,7 @@ export type GoDatabaseUploadStatus = {
   importableRows: number;
   skippedRows: number;
   supabaseImportedRows: number;
+  syncedProfiles?: number;
   supabaseStrategy: string;
 };
 

@@ -28,6 +28,7 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `account_roles`
   - `role_requests`
   - `player_profiles`
+  - `coach_player_links`
   - `school_database`
 - Current migrations:
   - `202606010001_go_player_database.sql`
@@ -36,6 +37,9 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606010004_lock_identity_direct_updates.sql`
   - `202606010005_pdpa_consent.sql`
   - `202606010006_school_database.sql`
+  - `202606010007_sync_profiles_after_go_db_import.sql`
+  - `202606020001_role_management.sql`
+  - `202606030001_coach_player_links.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
@@ -43,6 +47,7 @@ This is the short, current-state handoff for agents switching between Codex and 
 - Admin dashboard dark UI exists at `/admin`.
 - Admin Database page exists at `/admin/database`.
 - Admin Database upload supports DAN/KYU/AWARD Excel files and imports parsed rows to Supabase.
+- Go DB upload now re-syncs already verified Player Profiles after each import. Verified profiles are rematched by normalized Thai first/last name against the current `go_player_database`, with DAN priority over KYU/AWARD and then highest `power_level`; matching rows update `rank`, `power_level`, `rating`, and `matched_go_player_id`.
 - Admin Database upload also supports `SCHOOL_Database.xlsx` with columns `seq`, `name`, `keywords`; it imports to `school_database`.
 - Go DB parser reads real files from `D:/Programming/Database` by default.
 - `go_player_database` currently has 3,762 rows:
@@ -52,6 +57,18 @@ This is the short, current-state handoff for agents switching between Codex and 
 - `school_database` currently has 3 rows from `D:/Programming/Database/SCHOOL_Database.xlsx`.
 - Rank search API exists at `POST /api/rank/search`.
 - School search API exists at `GET /api/schools/search?q=...`.
+- Admin role-management page exists at `/admin/roles`:
+  - Shows real Coach role requests from `role_requests`.
+  - Approve/reject calls `review_coach_request`.
+  - Creates one-time Referee invite codes stored only as salted hashes.
+- Referee invite redeem page exists at `/referee/invite` and calls `redeem_referee_invite`.
+- Migration `202606020001_role_management.sql` has been pushed to the real Supabase project.
+- Coach/Profile link flow exists at `/profile`:
+  - `coach_player_links` stores Coach-to-Player relationships.
+  - Active Coach can search existing Player accounts by Player Profile ID, exact email, or name.
+  - Active Coach can send a pending link request.
+  - Player can approve/reject incoming Coach Link requests.
+  - Coach sees approved linked players separately from pending/rejected requests.
 - Public/auth UX is mobile-frame only:
   - `/login`
   - `/register`
@@ -71,21 +88,17 @@ This is the short, current-state handoff for agents switching between Codex and 
   - New shared components: `src/components/mobile/wheel-date-picker.tsx`, `src/components/mobile/searchable-select.tsx`.
   - Institute now uses an autocomplete field backed by the real `school_database`; users can still type a custom value if the school is missing.
 
-## Important Blocker
+## Signup Verification
 
-Real atomic signup is coded but blocked until a real server-only Supabase key is added:
+Real atomic signup is no longer blocked locally. `.env.local` contains a real server-only Supabase key, and `POST /api/auth/signup` was verified on 2026-06-02 (Asia/Bangkok) against the real Supabase project.
 
-```env
-SUPABASE_SECRET_KEY=
-# or
-SUPABASE_SERVICE_ROLE_KEY=
-```
+Verified cases:
 
-Without this key, `POST /api/auth/signup` intentionally returns:
+- Player signup with self-declared `15 Kyu` creates `auth.users`, `accounts`, active `account_roles.player`, `player_profiles.rank_status = pending`, and PDPA consent.
+- Coach signup with self-declared `1 Dan` creates the same Player account/profile plus `role_requests.coach = pending`.
+- Matched signup using Go DB player `โฆษา อารียา` creates `player_profiles.rank = 6 Dan`, `rank_status = verified`, `rating = 1600`, and `matched_go_player_id = 51741dcc-ff41-4371-abf8-389f4a810c92`.
 
-`Missing SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY for real signup`
-
-After adding the key, restart the dev server.
+Test emails were `codex-e2e-...@example.com`.
 
 ## Key Routes And Behavior
 
@@ -104,6 +117,16 @@ After adding the key, restart the dev server.
   - Exchanges Supabase recovery code and redirects.
 - `POST /api/auth/update-password`
   - Updates password for the active recovery/login session.
+- `/admin/roles`
+  - Server page listing Coach requests and recent Referee invites from Supabase.
+  - Server actions create invites and approve/reject Coach requests.
+  - Route-level Admin access protection is intentionally deferred.
+- `/referee/invite`
+  - Logged-in users can redeem a one-time Referee invite code.
+- `/profile`
+  - Logged-in users see Player Profile, roles, incoming Coach Link requests, and Coach tools.
+  - Active Coach users can search existing Player accounts and request a link.
+  - Player owners approve/reject Coach Link requests.
 
 ## Supabase Notes
 
@@ -130,9 +153,10 @@ Local `.env.local` currently has:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SECRET_KEY` and/or `SUPABASE_SERVICE_ROLE_KEY`
 - `IDENTITY_HASH_SALT`
 
-It does not currently include a real unmasked secret/service key.
+Do not copy real secret values into docs, commits, or chat.
 
 ## Verification Commands
 
@@ -154,23 +178,36 @@ Useful URL checks:
 - `http://127.0.0.1:3000/register`
 - `http://127.0.0.1:3000/admin/database`
 
+## Role Management Verification
+
+Verified on 2026-06-03 (Asia/Bangkok):
+
+- `supabase db push` applied:
+  - `202606010007_sync_profiles_after_go_db_import.sql`
+  - `202606020001_role_management.sql`
+- `referee_invite_codes` exists on remote Supabase.
+- `create_referee_invite` + `redeem_referee_invite` were tested with a `codex-e2e-player-self-...@example.com` account and granted active `account_roles.referee`.
+- `review_coach_request` was tested with a `codex-e2e-coach-self-...@example.com` account and granted active `account_roles.coach`.
+- `/admin/roles` returns 200 with no role-management warning after migration.
+
+## Coach Link Verification
+
+Verified on 2026-06-03 (Asia/Bangkok):
+
+- `supabase db push` applied `202606030001_coach_player_links.sql`.
+- Active Coach `codex-e2e-coach-self-...@example.com` can search existing Player `codex-e2e-player-matched-...@example.com`.
+- `request_coach_player_link` creates/reuses a pending link.
+- `respond_coach_player_link` approves the pending link as the Player owner.
+- Approved links are visible when querying `coach_player_links` by Coach with `status = approved`.
+- Failure checks passed:
+  - Non-Coach account cannot request a Coach Link.
+  - Coach cannot link to their own Player Profile.
+- `/profile` returns 200 after the feature migration.
+
 ## Recommended Next Task
 
-1. Add real `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` to `.env.local`.
-2. Restart dev server.
-3. Test real signup:
-   - Player self-declared rank.
-   - Coach self-declared rank.
-   - Matched rank using a known Go DB name.
-4. Verify created rows in Supabase:
-   - `auth.users`
-   - `accounts`
-   - `account_roles`
-   - `player_profiles`
-   - `role_requests` for Coach.
-
-After signup is verified, next product work should be Admin role-management:
-
-- Coach approval queue.
-- Referee invite creation/redeem.
-- Admin-only access protection.
+1. Continue the remaining Sprint 3 scope:
+   - Authenticated Home/Digital ID polish.
+   - Profile display polish if needed.
+2. Then move to Sprint 4 Tournament CRUD.
+3. Do route-level `admin-only access protection` after the role workflows are usable.
