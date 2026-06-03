@@ -1,26 +1,32 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
   Database,
   ShieldCheck,
-  TicketCheck,
+  Trophy,
   UsersRound,
   WalletCards,
 } from "lucide-react";
 import { getCoachRequests } from "@/lib/admin/role-management";
 import { getGoDatabaseSummaries } from "@/lib/go/database-summary";
+import { getAdminTournaments } from "@/lib/tournaments/admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const [summaries, coachRequests] = await Promise.all([
+  const [summaries, coachRequests, tournamentResult] = await Promise.all([
     getGoDatabaseSummaries(),
     getCoachRequests(),
+    getTournamentDashboardState(),
   ]);
+  const tournaments = tournamentResult.tournaments;
   const totalImportable = summaries.reduce((sum, item) => sum + item.importableRows, 0);
   const totalSkipped = summaries.reduce((sum, item) => sum + item.skippedRows, 0);
   const readySources = summaries.filter((item) => !item.error && item.importableRows > 0).length;
   const pendingCoachRequests = coachRequests.filter((request) => request.status === "pending").length;
+  const openTournaments = tournaments.filter((tournament) => tournament.status === "open").length;
+  const draftTournaments = tournaments.filter((tournament) => tournament.status === "draft").length;
 
   return (
     <div className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
@@ -35,10 +41,10 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
         <Link
-          href="/admin/database"
+          href="/admin/tournaments"
           className="inline-flex w-fit items-center justify-center gap-2 rounded-md bg-[#6c72ff] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#7c82ff]"
         >
-          เปิด Database
+          เปิด Tournament CRUD
           <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>
       </header>
@@ -52,10 +58,13 @@ export default async function AdminDashboardPage() {
           tone="cyan"
         />
         <OverviewWidget
-          icon={<TicketCheck className="h-5 w-5" />}
-          label="Registrations"
-          value="-"
-          detail="รอเปิดระบบสมัครแข่งขัน"
+          icon={<Trophy className="h-5 w-5" />}
+          label="Tournaments"
+          value={tournamentResult.error ? "-" : tournaments.length.toLocaleString("th-TH")}
+          detail={
+            tournamentResult.error ??
+            `${openTournaments.toLocaleString("th-TH")} open, ${draftTournaments.toLocaleString("th-TH")} draft`
+          }
           tone="violet"
         />
         <OverviewWidget
@@ -86,15 +95,29 @@ export default async function AdminDashboardPage() {
             </span>
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-2">
-            {["Tournament", "Player roles", "Referee tools", "Exports"].map((label) => (
-              <div
-                key={label}
-                className="min-h-32 rounded-md border border-dashed border-[#2c3961] bg-[#0c142d] p-4"
-              >
-                <p className="text-sm font-semibold text-[#dce3ff]">{label}</p>
-                <p className="mt-2 text-xs leading-5 text-[#7480aa]">ยังไม่มีข้อมูลจริงให้แสดง</p>
-              </div>
-            ))}
+            <OverviewLink
+              href="/admin/tournaments"
+              title="Tournament"
+              description={
+                tournamentResult.error ??
+                "จัดการรายการแข่งขันจริง, divisions และ promo codes"
+              }
+            />
+            <OverviewLink
+              href="/admin/roles"
+              title="Player roles"
+              description={`${pendingCoachRequests.toLocaleString("th-TH")} pending coach approval`}
+            />
+            <OverviewLink
+              href="/admin/roles"
+              title="Referee tools"
+              description="สร้าง invite code สำหรับ referee role"
+            />
+            <OverviewLink
+              href="/admin/database"
+              title="Exports"
+              description="ข้อมูล import/export จะต่อยอดหลัง registration/payment"
+            />
           </div>
         </div>
 
@@ -133,6 +156,37 @@ export default async function AdminDashboardPage() {
   );
 }
 
+async function getTournamentDashboardState() {
+  try {
+    return {
+      error: null,
+      tournaments: await getAdminTournaments(),
+    };
+  } catch (error) {
+    return {
+      error: getTournamentDashboardError(error),
+      tournaments: [],
+    };
+  }
+}
+
+function getTournamentDashboardError(error: unknown) {
+  if (isSupabaseErrorCode(error, "PGRST205")) {
+    return "Tournament migration pending";
+  }
+
+  return "Tournament summary unavailable";
+}
+
+function isSupabaseErrorCode(error: unknown, code: string) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === code
+  );
+}
+
 function OverviewWidget({
   icon,
   label,
@@ -140,7 +194,7 @@ function OverviewWidget({
   detail,
   tone,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   detail: string;
@@ -163,5 +217,27 @@ function OverviewWidget({
       <p className="mt-2 text-3xl font-semibold text-white">{value}</p>
       <p className="mt-2 text-xs leading-5 text-[#7480aa]">{detail}</p>
     </article>
+  );
+}
+
+function OverviewLink({
+  description,
+  href,
+  title,
+}: {
+  description: string;
+  href: string;
+  title: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group min-h-32 rounded-md border border-dashed border-[#2c3961] bg-[#0c142d] p-4 transition hover:border-[#6c72ff] hover:bg-[#111a34]"
+    >
+      <p className="text-sm font-semibold text-[#dce3ff]">{title}</p>
+      <p className="mt-2 text-xs leading-5 text-[#7480aa] transition group-hover:text-[#aab4da]">
+        {description}
+      </p>
+    </Link>
   );
 }

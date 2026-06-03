@@ -17,6 +17,8 @@ Last updated: 2026-06-01
 - Public signup can choose only `player` or `coach`.
 - `referee` must come from an Admin invite code later.
 - `admin` is seeded/managed manually by the owner.
+- During dev mode, Admin routes are intentionally not protected at route level. Do not implement Admin route guards yet.
+- When Admin protection is enabled later, it must use the same Supabase Auth/account system as normal users and check `account_roles.admin = active`; there is no separate Admin login.
 - Every user signing up as Player or Coach creates exactly one Player Profile for themself.
 - Coach receives active `player` role immediately so they can compete.
 - Coach role starts as `role_requests.coach = pending`.

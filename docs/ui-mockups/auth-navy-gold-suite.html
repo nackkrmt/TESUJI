@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TESUJI Auth Suite - Navy Gold Mockup</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap");
+
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg: #050b16;
+      --frame: #071222;
+      --panel: #0d1b31;
+      --panel-2: #122640;
+      --panel-3: #172f4f;
+      --ink: #fff7e6;
+      --muted: #b9c4d0;
+      --dim: #8395aa;
+      --line: rgba(255, 247, 230, .13);
+      --gold: #d8aa4f;
+      --gold-2: #f3d076;
+      --gold-soft: rgba(216, 170, 79, .12);
+      --teal: #3dd3b0;
+      --teal-soft: rgba(61, 211, 176, .11);
+      --red: #f06a4d;
+      --red-soft: rgba(240, 106, 77, .12);
+      --radius: 8px;
+      --shadow: 0 26px 74px rgba(0,0,0,.44);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Noto Sans Thai", "Segoe UI", sans-serif;
+      background:
+        linear-gradient(90deg, rgba(216, 170, 79, .05) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(216, 170, 79, .05) 1px, transparent 1px),
+        radial-gradient(circle at 16% 10%, rgba(61, 211, 176, .12), transparent 26rem),
+        radial-gradient(circle at 84% 14%, rgba(216, 170, 79, .13), transparent 26rem),
+        linear-gradient(145deg, #020611, #071326 52%, #020611);
+      background-size: 34px 34px, 34px 34px, auto, auto, auto;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button, a { touch-action: manipulation; }
+    button, input, select { font: inherit; }
+
+    .page {
+      width: min(100%, 1520px);
+      margin: 0 auto;
+      padding: 34px 22px 48px;
+    }
+
+    .intro {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 26px;
+    }
+
+    .intro h1 {
+      max-width: 650px;
+      margin: 0;
+      color: var(--ink);
+      font-size: clamp(30px, 4.5vw, 56px);
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+
+    .intro p {
+      max-width: 540px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.75;
+    }
+
+    .home-link {
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 13px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--gold-2);
+      background: rgba(255,255,255,.045);
+      font-weight: 900;
+      box-shadow: 0 12px 26px rgba(0,0,0,.18);
+    }
+
+    .suite {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(300px, 1fr));
+      gap: 18px;
+      align-items: start;
+      overflow-x: auto;
+      padding-bottom: 10px;
+      scroll-snap-type: x proximity;
+    }
+
+    .phone-wrap {
+      min-width: 300px;
+      scroll-snap-align: start;
+      padding: 10px;
+      border: 1px solid rgba(216,170,79,.18);
+      border-radius: 34px;
+      background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(24px);
+    }
+
+    .phone {
+      position: relative;
+      min-height: 760px;
+      overflow: hidden;
+      border: 1px solid rgba(216,170,79,.16);
+      border-radius: 26px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.035), transparent),
+        var(--frame);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.08),
+        inset 0 -26px 68px rgba(0,0,0,.3);
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, rgba(216,170,79,.08), transparent 31%),
+        linear-gradient(45deg, transparent 65%, rgba(61,211,176,.07));
+    }
+
+    .screen {
+      position: relative;
+      z-index: 1;
+      min-height: 760px;
+      display: flex;
+      flex-direction: column;
+      padding: 18px 16px;
+    }
+
+    .brand {
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand img {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius);
+      background: #fff9ec;
+      box-shadow: 0 12px 30px rgba(216,170,79,.2);
+    }
+
+    .brand strong {
+      display: block;
+      color: var(--gold-2);
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+
+    .brand span span {
+      display: block;
+      margin-top: 1px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hero {
+      margin-top: 24px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .eyebrow {
+      width: fit-content;
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 10px;
+      border: 1px solid rgba(61,211,176,.28);
+      border-radius: var(--radius);
+      color: #bdf7ea;
+      background: var(--teal-soft);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--ink);
+      font-size: 29px;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .mini-id {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: center;
+      margin-top: 18px;
+      padding: 14px;
+      border: 1px solid rgba(216,170,79,.22);
+      border-radius: 16px;
+      background:
+        linear-gradient(130deg, rgba(243,208,118,.16), transparent 54%),
+        linear-gradient(145deg, #0f2440, #081729 70%, #06101d);
+      box-shadow: 0 18px 38px rgba(0,0,0,.26);
+    }
+
+    .mini-id strong {
+      display: block;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .mini-id span span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .mini-board {
+      width: 58px;
+      height: 58px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius);
+      color: #071222;
+      background:
+        linear-gradient(90deg, rgba(7,18,34,.2) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(7,18,34,.2) 1px, transparent 1px),
+        linear-gradient(145deg, var(--gold-2), var(--gold));
+      background-size: 13px 13px, 13px 13px, auto;
+      font-weight: 900;
+    }
+
+    form, .form {
+      display: grid;
+      gap: 13px;
+      margin-top: 20px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    label, .label {
+      color: #e9dcc2;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .required { color: var(--gold-2); }
+
+    input, select {
+      width: 100%;
+      min-height: 50px;
+      border: 1px solid rgba(255,247,230,.14);
+      border-radius: var(--radius);
+      color: var(--ink);
+      background: rgba(255,255,255,.055);
+      padding: 11px 12px;
+      outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+      transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+    }
+
+    input::placeholder { color: rgba(185,196,208,.6); }
+
+    select option {
+      color: #071222;
+      background: #fff7e6;
+    }
+
+    input:focus, select:focus {
+      border-color: rgba(243,208,118,.58);
+      background: rgba(255,255,255,.085);
+      box-shadow: 0 0 0 3px rgba(216,170,79,.14);
+    }
+
+    .password-field {
+      position: relative;
+    }
+
+    .password-field input { padding-right: 52px; }
+
+    .inline-icon {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 50px;
+      height: 50px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .check {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .check input {
+      width: 18px;
+      min-width: 18px;
+      height: 18px;
+      min-height: 18px;
+      accent-color: var(--gold);
+    }
+
+    .link {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--gold-2);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .button {
+      min-height: 52px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      border: 0;
+      border-radius: var(--radius);
+      color: #071222;
+      background: linear-gradient(145deg, var(--gold-2), var(--gold));
+      cursor: pointer;
+      font-weight: 900;
+      box-shadow: 0 16px 32px rgba(216,170,79,.18);
+      transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
+    }
+
+    .button:hover { filter: brightness(1.04); }
+    .button:active { transform: translateY(1px); }
+
+    .button.secondary {
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: rgba(255,255,255,.045);
+      box-shadow: 0 12px 24px rgba(0,0,0,.18);
+    }
+
+    .button.secondary:hover { background: rgba(255,255,255,.07); }
+
+    .footer-note {
+      margin-top: auto;
+      padding-top: 20px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .progress {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+      margin-top: 18px;
+    }
+
+    .step { min-width: 0; }
+
+    .step i {
+      display: block;
+      height: 6px;
+      border-radius: 99px;
+      background: rgba(255,255,255,.1);
+    }
+
+    .step.done i { background: var(--gold-2); }
+
+    .step span {
+      display: block;
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 900;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .two {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .option {
+      min-height: 78px;
+      display: grid;
+      align-content: center;
+      gap: 3px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--ink);
+      background: rgba(255,255,255,.045);
+      cursor: pointer;
+    }
+
+    .option.active {
+      border-color: rgba(243,208,118,.58);
+      background: var(--gold-soft);
+      box-shadow: 0 0 0 3px rgba(216,170,79,.1);
+    }
+
+    .option strong {
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .option span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .alert,
+    .success,
+    .pdpa {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 11px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .alert {
+      border: 1px solid rgba(240,106,77,.28);
+      color: #ffd3ca;
+      background: var(--red-soft);
+    }
+
+    .success {
+      border: 1px solid rgba(61,211,176,.28);
+      color: #c7fff1;
+      background: var(--teal-soft);
+    }
+
+    .pdpa {
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: rgba(255,255,255,.045);
+    }
+
+    .pdpa input {
+      width: 18px;
+      min-width: 18px;
+      height: 18px;
+      min-height: 18px;
+      margin-top: 2px;
+      accent-color: var(--gold);
+    }
+
+    .rank-card {
+      display: grid;
+      gap: 12px;
+      padding: 13px;
+      border: 1px solid rgba(216,170,79,.22);
+      border-radius: 14px;
+      background:
+        linear-gradient(130deg, rgba(243,208,118,.14), transparent 56%),
+        var(--panel);
+      box-shadow: 0 14px 28px rgba(0,0,0,.2);
+    }
+
+    .rank-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .rank-top strong {
+      display: block;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .rank-top span span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill {
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 9px;
+      border-radius: var(--radius);
+      color: #071222;
+      background: var(--gold-2);
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .rank-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .rank-stat {
+      min-height: 56px;
+      padding: 8px;
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.055);
+    }
+
+    .rank-stat span {
+      display: block;
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .rank-stat strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 14px;
+    }
+
+    .password-rules {
+      display: grid;
+      gap: 7px;
+      margin-top: 2px;
+    }
+
+    .rule {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .rule svg { color: var(--teal); }
+
+    .mini-nav {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid rgba(216,170,79,.16);
+      border-radius: 18px;
+      background: rgba(5, 13, 25, .88);
+      box-shadow: 0 18px 42px rgba(0,0,0,.4);
+      backdrop-filter: blur(18px);
+    }
+
+    .mini-nav a {
+      min-height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius);
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .mini-nav a.active {
+      color: var(--gold-2);
+      background: var(--gold-soft);
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
+
+    :focus-visible {
+      outline: 3px solid rgba(243,208,118,.62);
+      outline-offset: 3px;
+    }
+
+    @media (max-width: 980px) {
+      .intro { display: block; }
+      .home-link { margin-top: 18px; }
+    }
+
+    @media (max-width: 720px) {
+      body { background-size: 28px 28px, 28px 28px, auto, auto, auto; }
+      .page { padding: 0; }
+      .intro {
+        padding: 22px 16px 16px;
+        margin-bottom: 0;
+      }
+      .intro h1 { font-size: 34px; }
+      .suite {
+        display: block;
+        overflow: visible;
+        padding: 0;
+      }
+      .phone-wrap {
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .phone {
+        min-height: 100vh;
+        border: 0;
+        border-radius: 0;
+      }
+      .screen { min-height: 100vh; }
+      .phone-wrap + .phone-wrap { margin-top: 18px; }
+    }
+
+    @media (max-width: 360px) {
+      .screen { padding-left: 12px; padding-right: 12px; }
+      h2 { font-size: 26px; }
+      .two { grid-template-columns: 1fr; }
+      .rank-grid { grid-template-columns: 1fr; }
+      .mini-nav {
+        position: static;
+        grid-template-columns: 1fr;
+        margin-top: 18px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="intro">
+      <div>
+        <h1>TESUJI Navy Gold Auth</h1>
+        <p>ชุดหน้า Login, Register, Forgot และ Reset ในธีมกรมท่า-ทอง: พรีเมียมกว่าเดิม แต่ยังอ่านง่ายและแตะง่ายสำหรับ mobile-only UX</p>
+      </div>
+      <a class="home-link" href="./index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        กลับไปหน้า mockups
+      </a>
+    </header>
+
+    <section class="suite" aria-label="Navy gold auth screen mockups">
+      <article class="phone-wrap" aria-label="Login screen">
+        <div class="phone">
+          <div class="screen">
+            <a class="brand" href="./home-digital-id-navy-gold.html">
+              <img src="../../Logo/Tesuji_Logo-03.svg" alt="TESUJI" />
+              <span><strong>TESUJI</strong><span>Thai Go Tournament</span></span>
+            </a>
+
+            <section class="hero">
+              <span class="eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                พร้อมสมัครแข่ง
+              </span>
+              <h2>เข้าสู่สนามของคุณ</h2>
+              <p class="lead">ใช้บัญชี TESUJI เพื่อดู Digital ID, สมัครแข่ง, อัปโหลดสลิป และติดตามผล</p>
+            </section>
+
+            <div class="mini-id">
+              <span><strong>Thailand Go Championship 2026</strong><span>เปิดรับสมัครแล้ว · 20 ก.ค. 2026</span></span>
+              <span class="mini-board">19x19</span>
+            </div>
+
+            <form>
+              <div class="field">
+                <label for="login-email">อีเมล</label>
+                <input id="login-email" type="email" autocomplete="email" placeholder="you@example.com" />
+              </div>
+              <div class="field">
+                <label for="login-password">รหัสผ่าน</label>
+                <div class="password-field">
+                  <input id="login-password" type="password" autocomplete="current-password" placeholder="อย่างน้อย 8 ตัวอักษร" />
+                  <button class="inline-icon" type="button" aria-label="แสดงรหัสผ่าน">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="row">
+                <label class="check"><input type="checkbox" checked />จดจำฉัน</label>
+                <a class="link" href="#forgot">ลืมรหัสผ่าน</a>
+              </div>
+              <button class="button" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                  <path d="m10 17 5-5-5-5" />
+                  <path d="M15 12H3" />
+                </svg>
+                เข้าสู่ระบบ
+              </button>
+            </form>
+
+            <p class="footer-note">ยังไม่มีบัญชี? <a class="link" href="#register">สมัครสมาชิก</a></p>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap" id="register" aria-label="Register profile screen">
+        <div class="phone">
+          <div class="screen">
+            <a class="brand" href="./home-digital-id-navy-gold.html">
+              <img src="../../Logo/Tesuji_Logo-03.svg" alt="TESUJI" />
+              <span><strong>TESUJI</strong><span>สมัครสมาชิก</span></span>
+            </a>
+
+            <div class="progress" aria-label="Register progress">
+              <span class="step done"><i></i><span>Profile</span></span>
+              <span class="step"><i></i><span>Rank</span></span>
+              <span class="step"><i></i><span>Role</span></span>
+              <span class="step"><i></i><span>Account</span></span>
+            </div>
+
+            <section class="hero">
+              <span class="eyebrow">Step 1 / 4</span>
+              <h2>สร้าง Player Profile</h2>
+              <p class="lead">กรอกข้อมูลนักกีฬาให้ครบก่อนค้นหา rank จากฐานข้อมูลจริง</p>
+            </section>
+
+            <div class="form">
+              <div class="field">
+                <span class="label">คำนำหน้า <span class="required">*</span></span>
+                <select aria-label="คำนำหน้า">
+                  <option>นาย (Mr.)</option>
+                  <option>นาง (Mrs.)</option>
+                  <option>นางสาว (Miss)</option>
+                  <option>เด็กชาย (Master)</option>
+                  <option>อื่น ๆ</option>
+                </select>
+              </div>
+              <div class="two">
+                <div class="field">
+                  <label for="first-th">ชื่อไทย <span class="required">*</span></label>
+                  <input id="first-th" value="โฆษา" />
+                </div>
+                <div class="field">
+                  <label for="last-th">นามสกุลไทย <span class="required">*</span></label>
+                  <input id="last-th" value="อารียา" />
+                </div>
+              </div>
+              <div class="two">
+                <div class="field">
+                  <label for="first-en">First name EN</label>
+                  <input id="first-en" value="Kosa" />
+                </div>
+                <div class="field">
+                  <label for="last-en">Last name EN</label>
+                  <input id="last-en" value="Areeya" />
+                </div>
+              </div>
+              <div class="two">
+                <div class="field">
+                  <span class="label">วันเกิด</span>
+                  <button class="button secondary" type="button">12 มี.ค. 1998</button>
+                </div>
+                <div class="field">
+                  <span class="label">สัญชาติ</span>
+                  <button class="button secondary" type="button">Thai</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="school">สถาบัน</label>
+                <input id="school" value="Siam Go Academy" />
+              </div>
+              <label class="pdpa">
+                <input type="checkbox" checked />
+                <span>ยินยอมให้ TESUJI จัดเก็บและประมวลผลข้อมูลส่วนบุคคลเพื่อยืนยันตัวตนและจัดการการแข่งขัน</span>
+              </label>
+              <button class="button" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                ถัดไป: ค้นหา Rank
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap" aria-label="Register rank role account screen">
+        <div class="phone">
+          <div class="screen">
+            <a class="brand" href="./home-digital-id-navy-gold.html">
+              <img src="../../Logo/Tesuji_Logo-03.svg" alt="TESUJI" />
+              <span><strong>TESUJI</strong><span>ยืนยันข้อมูล</span></span>
+            </a>
+
+            <div class="progress" aria-label="Register progress">
+              <span class="step done"><i></i><span>Profile</span></span>
+              <span class="step done"><i></i><span>Rank</span></span>
+              <span class="step done"><i></i><span>Role</span></span>
+              <span class="step"><i></i><span>Account</span></span>
+            </div>
+
+            <section class="hero">
+              <span class="eyebrow">Step 2-4 / 4</span>
+              <h2>ยืนยัน rank และ role</h2>
+              <p class="lead">ตัวอย่างหน้าที่รวมการ match rank, เลือก role และตั้งค่าบัญชีด้วยภาษาภาพเดียวกัน</p>
+            </section>
+
+            <div class="form">
+              <section class="rank-card">
+                <div class="rank-top">
+                  <span><strong>พบใน DAN Database</strong><span>Exact match · อัปเดตล่าสุดจาก Go DB</span></span>
+                  <span class="pill">verified</span>
+                </div>
+                <div class="rank-grid">
+                  <span class="rank-stat"><span>Rank</span><strong>6 Dan</strong></span>
+                  <span class="rank-stat"><span>Rating</span><strong>1600</strong></span>
+                  <span class="rank-stat"><span>Power</span><strong>22</strong></span>
+                </div>
+              </section>
+
+              <div class="field">
+                <span class="label">เลือก role ตอนสมัคร</span>
+                <div class="segmented">
+                  <button class="option active" type="button"><strong>Player</strong><span>สมัครแข่งด้วยตัวเอง</span></button>
+                  <button class="option" type="button"><strong>Coach</strong><span>รอ Admin อนุมัติ</span></button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="signup-email">อีเมล</label>
+                <input id="signup-email" type="email" value="kosa@example.com" />
+              </div>
+              <div class="field">
+                <label for="signup-password">รหัสผ่าน</label>
+                <div class="password-field">
+                  <input id="signup-password" type="password" value="password123" />
+                  <button class="inline-icon" type="button" aria-label="แสดงรหัสผ่าน">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="success" role="status">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                บัญชีนี้จะสร้าง Player Profile 1 รายการ และเปิด role player ทันที
+              </div>
+              <button class="button" type="button">สมัครสมาชิก</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap" id="forgot" aria-label="Forgot password screen">
+        <div class="phone">
+          <div class="screen">
+            <a class="brand" href="./home-digital-id-navy-gold.html">
+              <img src="../../Logo/Tesuji_Logo-03.svg" alt="TESUJI" />
+              <span><strong>TESUJI</strong><span>Account recovery</span></span>
+            </a>
+
+            <section class="hero">
+              <span class="eyebrow">Recovery</span>
+              <h2>รีเซ็ตรหัสผ่าน</h2>
+              <p class="lead">ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลที่ใช้สมัคร TESUJI</p>
+            </section>
+
+            <div class="mini-id">
+              <span><strong>ลิงก์จาก Supabase Auth</strong><span>ใช้เฉพาะขั้นตอน recovery ตาม decision ของระบบ</span></span>
+              <span class="mini-board">SEC</span>
+            </div>
+
+            <form>
+              <div class="field">
+                <label for="forgot-email">อีเมล</label>
+                <input id="forgot-email" type="email" value="kosa@example.com" />
+              </div>
+              <div class="success" role="status">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                ส่งลิงก์รีเซ็ตแล้ว กรุณาเช็กอีเมลของคุณ
+              </div>
+              <button class="button" type="button">ส่งลิงก์รีเซ็ต</button>
+              <a class="button secondary" href="#">กลับไป Login</a>
+            </form>
+
+            <nav class="mini-nav" aria-label="Auth quick nav">
+              <a href="#" class="active">Login</a>
+              <a href="#">Register</a>
+              <a href="#">Help</a>
+            </nav>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap" aria-label="Reset password screen">
+        <div class="phone">
+          <div class="screen">
+            <a class="brand" href="./home-digital-id-navy-gold.html">
+              <img src="../../Logo/Tesuji_Logo-03.svg" alt="TESUJI" />
+              <span><strong>TESUJI</strong><span>New password</span></span>
+            </a>
+
+            <section class="hero">
+              <span class="eyebrow">Secure session</span>
+              <h2>ตั้งรหัสผ่านใหม่</h2>
+              <p class="lead">กรอกรหัสผ่านใหม่หลังจากเปิดลิงก์ recovery จากอีเมล</p>
+            </section>
+
+            <form>
+              <div class="field">
+                <label for="new-password">รหัสผ่านใหม่</label>
+                <div class="password-field">
+                  <input id="new-password" type="password" value="newpassword123" />
+                  <button class="inline-icon" type="button" aria-label="แสดงรหัสผ่านใหม่">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="confirm-password">ยืนยันรหัสผ่านใหม่</label>
+                <div class="password-field">
+                  <input id="confirm-password" type="password" value="newpassword123" />
+                  <button class="inline-icon" type="button" aria-label="แสดงรหัสผ่านยืนยัน">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="password-rules" aria-label="Password checklist">
+                <span class="rule">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                  อย่างน้อย 8 ตัวอักษร
+                </span>
+                <span class="rule">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                  รหัสผ่านทั้งสองช่องตรงกัน
+                </span>
+              </div>
+
+              <div class="alert" role="alert">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v4" />
+                  <path d="M12 16h.01" />
+                </svg>
+                ถ้าลิงก์หมดอายุ ให้กลับไปส่งลิงก์รีเซ็ตใหม่อีกครั้ง
+              </div>
+
+              <button class="button" type="button">บันทึกรหัสผ่านใหม่</button>
+              <a class="button secondary" href="#">กลับไป Login</a>
+            </form>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

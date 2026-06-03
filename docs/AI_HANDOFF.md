@@ -1,6 +1,6 @@
 # TESUJI AI Handoff
 
-Last updated: 2026-06-01
+Last updated: 2026-06-04
 
 This is the short, current-state handoff for agents switching between Codex and Claude.
 
@@ -30,6 +30,9 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `player_profiles`
   - `coach_player_links`
   - `school_database`
+  - `tournaments`
+  - `divisions`
+  - `promo_codes`
 - Current migrations:
   - `202606010001_go_player_database.sql`
   - `202606010002_replace_go_player_database_source.sql`
@@ -40,6 +43,7 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606010007_sync_profiles_after_go_db_import.sql`
   - `202606020001_role_management.sql`
   - `202606030001_coach_player_links.sql`
+  - `202606040001_tournament_admin.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
@@ -69,6 +73,13 @@ This is the short, current-state handoff for agents switching between Codex and 
   - Active Coach can send a pending link request.
   - Player can approve/reject incoming Coach Link requests.
   - Coach sees approved linked players separately from pending/rejected requests.
+- Sprint 4 Tournament CRUD foundation exists:
+  - Migration `202606040001_tournament_admin.sql` creates `tournaments`, `divisions`, and `promo_codes`.
+  - Admin tournament routes use real Supabase data via trusted server actions/service layer.
+  - Admin can create draft tournaments, edit tournament details, change status, delete draft tournaments, add/edit divisions, and add/edit promo codes.
+  - Opening a tournament requires at least one active division.
+  - Public tournament list/detail read published non-draft tournament data from Supabase.
+  - Banner support is metadata-only in this slice (`banner_url` / `banner_alt`); storage upload/validation is not implemented yet.
 - Public/auth UX is mobile-frame only:
   - `/login`
   - `/register`
@@ -120,13 +131,35 @@ Test emails were `codex-e2e-...@example.com`.
 - `/admin/roles`
   - Server page listing Coach requests and recent Referee invites from Supabase.
   - Server actions create invites and approve/reject Coach requests.
-  - Route-level Admin access protection is intentionally deferred.
+  - Dev mode decision: do not add route-level Admin access protection yet; Admin routes stay reachable while functions are built.
+  - Future Admin protection must use the same Supabase Auth/account flow as normal users and gate by `account_roles.admin = active`; do not create separate Admin auth.
+- `/admin/tournaments`
+  - Server page listing real tournaments from Supabase.
+  - Dev mode decision applies here too: do not add route-level Admin access protection yet.
+- `/admin/tournaments/new`
+  - Creates a draft tournament through `createTournamentAction`.
+- `/admin/tournaments/[id]`
+  - Edits tournament details, status, divisions, and promo codes.
+  - Server actions return typed `{ status, message, id? }` results for form UX.
+  - Future Admin protection seam lives in `ensureAdminMutationAllowedForDevMode()` and must later check `account_roles.admin = active`.
 - `/referee/invite`
   - Logged-in users can redeem a one-time Referee invite code.
+- `/tournaments`
+  - Mobile-frame public list of non-draft tournaments from Supabase.
+- `/tournaments/[id]`
+  - Mobile-frame public detail page with real tournament details and divisions.
+  - Registration/payment CTA is intentionally disabled until Sprint 5.
 - `/profile`
   - Logged-in users see Player Profile, roles, incoming Coach Link requests, and Coach tools.
   - Active Coach users can search existing Player accounts and request a link.
   - Player owners approve/reject Coach Link requests.
+- Authenticated Home/Digital ID functional skeleton exists at `/`:
+  - Uses the real logged-in account, Player Profile, roles, and Coach Link data.
+  - Generates a real QR code from a non-secret Digital ID payload using `qrcode`.
+  - QR expands in a full-screen overlay.
+  - Quick Access points only at existing real routes.
+  - Active Coach users see approved linked players from `coach_player_links`.
+  - Tournament Snapshot links to the real `/tournaments` route; registration/payment remains an explicit Sprint 5 empty state.
 
 ## Supabase Notes
 
@@ -136,6 +169,8 @@ Test emails were `codex-e2e-...@example.com`.
 - Future profile edits should go through trusted server actions/routes.
 - `current_account_has_role` checks active roles.
 - Rank search RPC now returns evidence fields such as `year_promoted`, `rating`, `category`, `rank_award`, `event_name`, and `event_date`.
+- Tournament writes currently go through service-role server actions in dev mode with no route-level Admin guard by design.
+- Tournament public read RLS exposes non-draft tournaments/divisions; promo code reads are future-gated to active Admin accounts and currently managed through service-role admin actions.
 
 ## Dev Tooling
 
@@ -177,6 +212,8 @@ Useful URL checks:
 - `http://127.0.0.1:3000/login`
 - `http://127.0.0.1:3000/register`
 - `http://127.0.0.1:3000/admin/database`
+- `http://127.0.0.1:3000/admin/tournaments`
+- `http://127.0.0.1:3000/tournaments`
 
 ## Role Management Verification
 
@@ -204,10 +241,18 @@ Verified on 2026-06-03 (Asia/Bangkok):
   - Coach cannot link to their own Player Profile.
 - `/profile` returns 200 after the feature migration.
 
+## Tournament CRUD Verification
+
+Verified locally on 2026-06-04 (Asia/Bangkok):
+
+- `npm run lint` passed.
+- `npm run build` passed and Next lists `/admin/tournaments`, `/admin/tournaments/[id]`, `/admin/tournaments/new`, `/tournaments`, and `/tournaments/[id]`.
+- Supabase CLI migration dry-run was attempted with `npx supabase db push --dry-run --linked` but this session has no Supabase access token/login.
+- Remote Supabase currently returns `PGRST205` for `public.tournaments`, so the new migration still needs to be applied before browser CRUD smoke tests can pass against the real project.
+- Browser smoke opened `/tournaments`; it currently shows a server error because the remote migration is not applied yet.
+
 ## Recommended Next Task
 
-1. Continue the remaining Sprint 3 scope:
-   - Authenticated Home/Digital ID polish.
-   - Profile display polish if needed.
-2. Then move to Sprint 4 Tournament CRUD.
-3. Do route-level `admin-only access protection` after the role workflows are usable.
+1. Finish Sprint 4 verification and remote migration push/reset if not already done.
+2. Move to Sprint 5 Registration + Payment foundation.
+3. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.

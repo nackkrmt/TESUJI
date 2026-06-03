@@ -19,6 +19,7 @@ Read this before making changes. This file is for Codex, Claude, and any coding 
 - Register can choose only `player` or `coach`; `referee` requires Admin invite code later.
 - Coach accounts also have their own Player Profile and active `player` role. Coach role itself is pending until Admin approval.
 - AWARD rank calculation uses `rank_in_category` only. `category` is metadata/display/audit only.
+- Dev mode: do not add route-level Admin access protection yet. Keep Admin routes reachable while building functions. Prepare future Admin auth to use the same Supabase user/account flow as normal users, gated later by `account_roles.admin = active`; do not create a separate Admin login/auth system.
 
 ## Engineering Notes
 

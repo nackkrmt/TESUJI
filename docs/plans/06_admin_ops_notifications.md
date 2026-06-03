@@ -94,7 +94,8 @@ Reject cancel:
 
 ## Acceptance Tests
 
-- Non-admin cannot access admin queues
+- Dev mode: route-level Admin protection is deferred; do not block Admin queues yet
+- Future security gate: when protection is enabled, non-admin cannot access admin queues and the check uses `account_roles.admin = active`
 - Admin approve payment confirms all linked registrations
 - Reject-cancel returns quota exactly once
 - Approve rank recalculates power level
@@ -102,4 +103,3 @@ Reject cancel:
 - Referee invite raw code shown once and stored as hash
 - Manual notification sends N rows to selected audience
 - Export contains real DB rows and excludes sensitive fields
-

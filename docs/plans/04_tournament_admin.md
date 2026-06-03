@@ -89,8 +89,8 @@
 
 - Admin creates tournament with two divisions
 - Public list/detail shows real data
-- Non-admin cannot create/edit tournament
+- Dev mode: route-level Admin protection is deferred; do not block Admin routes yet
+- Future security gate: when protection is enabled, non-admin cannot create/edit tournament and the check uses `account_roles.admin = active`
 - Banner validation blocks wrong type/size/aspect
 - Promo code scoped to one division fails on another division
 - Draft hard delete works only if status draft
-
