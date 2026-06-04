@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import {
-  DivisionForm,
   PromoCodeForm,
   TournamentForm,
   TournamentStatusActions,
@@ -35,7 +34,7 @@ export default async function AdminTournamentDetailPage({
             Back to tournaments
           </Link>
           <h1 className="mt-4 text-3xl font-semibold tracking-normal text-white">
-            {tournament.titleTh}
+            {tournament.title}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#8390bd]">
             จัดการข้อมูลกลาง รุ่นแข่งขัน และ promo codes ของรายการนี้
@@ -54,19 +53,6 @@ export default async function AdminTournamentDetailPage({
 
       <TournamentStatusActions tournament={tournament} />
       <TournamentForm mode="update" tournament={tournament} />
-
-      <section className="grid gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-white">Divisions</h2>
-          <p className="mt-1 text-sm text-[#8390bd]">
-            เพิ่มอย่างน้อยหนึ่ง active division ก่อนเปลี่ยนสถานะเป็น open
-          </p>
-        </div>
-        <DivisionForm tournamentId={tournament.id} />
-        {tournament.divisions.map((division) => (
-          <DivisionForm key={division.id} tournamentId={tournament.id} division={division} />
-        ))}
-      </section>
 
       <section className="grid gap-4">
         <div>

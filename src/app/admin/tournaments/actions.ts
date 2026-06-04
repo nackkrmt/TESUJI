@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
-  createTournament,
+  createTournamentWithDivisions,
   deleteDraftTournament,
   setTournamentStatus,
-  updateTournament,
+  updateTournamentWithDivisions,
   upsertDivision,
   upsertPromoCode,
   type DivisionInput,
@@ -34,18 +34,23 @@ const statusSchema = z.enum([
 ]);
 const divisionStatusSchema = z.enum(["active", "closed", "cancelled"]);
 const discountTypeSchema = z.enum(["free", "percentage", "fixed"]);
+const timeSlotLabels = new Set(["เช้า", "บ่าย", "เต็มวัน"]);
 
 export async function createTournamentAction(
   _previousState: TournamentActionState,
   formData: FormData,
 ): Promise<TournamentActionState> {
   try {
-    const id = await createTournament(parseTournamentInput(formData));
+    const id = await createTournamentWithDivisions(
+      parseTournamentInput(formData),
+      parseDivisionsInput(formData),
+      parseBannerFile(formData),
+    );
     revalidateTournamentPaths(id);
 
     return {
       status: "success",
-      message: "Tournament draft created.",
+      message: "Tournament draft created with divisions.",
       id,
     };
   } catch (error) {
@@ -59,12 +64,17 @@ export async function updateTournamentAction(
 ): Promise<TournamentActionState> {
   try {
     const id = uuidSchema.parse(formData.get("tournamentId"));
-    await updateTournament(id, parseTournamentInput(formData));
+    await updateTournamentWithDivisions(
+      id,
+      parseTournamentInput(formData),
+      parseDivisionsInput(formData),
+      parseBannerFile(formData),
+    );
     revalidateTournamentPaths(id);
 
     return {
       status: "success",
-      message: "Tournament updated.",
+      message: "Tournament and divisions updated.",
       id,
     };
   } catch (error) {
@@ -153,27 +163,81 @@ export async function upsertPromoCodeAction(
 
 function parseTournamentInput(formData: FormData): TournamentInput {
   const input = {
-    titleTh: cleanRequiredText(formData.get("titleTh"), "Tournament title TH is required."),
-    titleEn: cleanOptionalText(formData.get("titleEn")),
+    title: cleanRequiredText(formData.get("title"), "Event title is required."),
     description: cleanOptionalText(formData.get("description")),
-    venueName: cleanOptionalText(formData.get("venueName")),
     venueAddress: cleanOptionalText(formData.get("venueAddress")),
+    googleMapsUrl: cleanOptionalText(formData.get("googleMapsUrl")),
+    eventDate: parseOptionalDateOnly(formData.get("eventDate")),
     registrationOpensAt: parseOptionalDateTime(formData.get("registrationOpensAt")),
     registrationClosesAt: parseOptionalDateTime(formData.get("registrationClosesAt")),
-    eventStartsAt: parseOptionalDateTime(formData.get("eventStartsAt")),
-    eventEndsAt: parseOptionalDateTime(formData.get("eventEndsAt")),
     promptpayId: cleanOptionalText(formData.get("promptpayId")),
     promptpayName: cleanOptionalText(formData.get("promptpayName")),
-    bannerUrl: cleanOptionalText(formData.get("bannerUrl")),
+    bannerUrl: cleanOptionalText(formData.get("existingBannerUrl")),
     bannerAlt: cleanOptionalText(formData.get("bannerAlt")),
   };
 
   assertWindow(input.registrationOpensAt, input.registrationClosesAt, "Registration close must be after open.");
-  assertWindow(input.eventStartsAt, input.eventEndsAt, "Event end must be after start.");
 
   if (input.bannerUrl && !isSafeBannerUrl(input.bannerUrl)) {
     throw new Error("Banner URL must start with http://, https://, or /.");
   }
+
+  if (input.googleMapsUrl && !isSafeHttpUrl(input.googleMapsUrl)) {
+    throw new Error("Google Maps URL must start with http:// or https://.");
+  }
+
+  return input;
+}
+
+function parseDivisionsInput(formData: FormData): DivisionInput[] {
+  const raw = cleanRequiredText(formData.get("divisionsJson"), "Add at least one division.");
+  let payload: unknown;
+
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    throw new Error("Division data is invalid JSON.");
+  }
+
+  if (!Array.isArray(payload) || payload.length === 0) {
+    throw new Error("Add at least one division.");
+  }
+
+  return payload.map((value, index) => parseDivisionJson(value, index));
+}
+
+function parseDivisionJson(value: unknown, index: number): DivisionInput {
+  if (typeof value !== "object" || value === null) {
+    throw new Error(`Division ${index + 1} is invalid.`);
+  }
+
+  const record = value as Record<string, unknown>;
+  const timeSlotLabel = cleanOptionalUnknownText(record.timeSlotLabel);
+
+  if (timeSlotLabel && !timeSlotLabels.has(timeSlotLabel)) {
+    throw new Error(`Division ${index + 1} has an invalid time slot.`);
+  }
+
+  const input = {
+    id: parseOptionalUuidFromUnknown(record.id),
+    name: cleanRequiredUnknownText(record.name, `Division ${index + 1} name is required.`),
+    description: null,
+    feeAmount: parseMoneyFromUnknown(record.feeAmount),
+    maxPlayers: parseOptionalIntegerFromUnknown(record.maxPlayers),
+    minPowerLevel: parseOptionalIntegerFromUnknown(record.minPowerLevel),
+    maxPowerLevel: parseOptionalIntegerFromUnknown(record.maxPowerLevel),
+    minAge: parseOptionalIntegerFromUnknown(record.minAge),
+    maxAge: parseOptionalIntegerFromUnknown(record.maxAge),
+    timeSlotLabel: timeSlotLabel ?? "เช้า",
+    startsAt: null,
+    endsAt: null,
+    pairingMethod: "macmahon",
+    status: "active" as DivisionStatus,
+    sortOrder: index,
+  };
+
+  assertNumericWindow(input.minPowerLevel, input.maxPowerLevel, `Division ${index + 1} max power must be at least min power.`);
+  assertNumericWindow(input.minAge, input.maxAge, `Division ${index + 1} max age must be at least min age.`);
 
   return input;
 }
@@ -253,6 +317,46 @@ function cleanOptionalText(value: FormDataEntryValue | null) {
   return cleaned.length > 0 ? cleaned : null;
 }
 
+function cleanRequiredUnknownText(value: unknown, message: string) {
+  const cleaned = cleanOptionalUnknownText(value);
+  if (!cleaned) {
+    throw new Error(message);
+  }
+
+  return cleaned;
+}
+
+function cleanOptionalUnknownText(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const cleaned = value.trim();
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+function parseOptionalDateOnly(value: FormDataEntryValue | null) {
+  const cleaned = cleanOptionalText(value);
+  if (!cleaned) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+    throw new Error(`Invalid date: ${cleaned}`);
+  }
+
+  const date = new Date(`${cleaned}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date: ${cleaned}`);
+  }
+
+  return cleaned;
+}
+
 function parseOptionalDateTime(value: FormDataEntryValue | null) {
   const cleaned = cleanOptionalText(value);
   if (!cleaned) {
@@ -269,6 +373,17 @@ function parseOptionalDateTime(value: FormDataEntryValue | null) {
 
 function parseMoney(value: FormDataEntryValue | null) {
   const cleaned = cleanOptionalText(value) ?? "0";
+  const amount = Number(cleaned);
+
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error("Amount must be 0 or greater.");
+  }
+
+  return Math.round(amount * 100) / 100;
+}
+
+function parseMoneyFromUnknown(value: unknown) {
+  const cleaned = cleanOptionalUnknownText(value) ?? "0";
   const amount = Number(cleaned);
 
   if (!Number.isFinite(amount) || amount < 0) {
@@ -306,9 +421,38 @@ function parseOptionalInteger(value: FormDataEntryValue | null) {
   return parsed;
 }
 
+function parseOptionalIntegerFromUnknown(value: unknown) {
+  const cleaned = cleanOptionalUnknownText(value);
+  if (!cleaned) {
+    return null;
+  }
+
+  const parsed = Number(cleaned);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error("Optional integer fields must be 0 or greater.");
+  }
+
+  return parsed;
+}
+
 function parseOptionalUuid(value: FormDataEntryValue | null) {
   const cleaned = cleanOptionalText(value);
   return cleaned ? uuidSchema.parse(cleaned) : undefined;
+}
+
+function parseOptionalUuidFromUnknown(value: unknown) {
+  const cleaned = cleanOptionalUnknownText(value);
+  return cleaned ? uuidSchema.parse(cleaned) : undefined;
+}
+
+function parseBannerFile(formData: FormData) {
+  const value = formData.get("bannerFile");
+
+  if (typeof File === "undefined" || !(value instanceof File) || value.size === 0) {
+    return null;
+  }
+
+  return value;
 }
 
 function assertWindow(start: string | null, end: string | null, message: string) {
@@ -325,6 +469,10 @@ function assertNumericWindow(min: number | null, max: number | null, message: st
 
 function isSafeBannerUrl(value: string) {
   return value.startsWith("/") || value.startsWith("https://") || value.startsWith("http://");
+}
+
+function isSafeHttpUrl(value: string) {
+  return value.startsWith("https://") || value.startsWith("http://");
 }
 
 function revalidateTournamentPaths(id?: string) {

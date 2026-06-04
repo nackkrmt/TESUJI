@@ -94,14 +94,11 @@ function TournamentAdminCard({ tournament }: { tournament: TournamentRecord }) {
             <StatusBadge status={tournament.status} />
             <span className="text-xs text-[#7480aa]">Updated {formatDate(tournament.updatedAt)}</span>
           </div>
-          <h2 className="mt-3 text-2xl font-semibold text-white">{tournament.titleTh}</h2>
-          {tournament.titleEn ? (
-            <p className="mt-1 text-sm text-[#8390bd]">{tournament.titleEn}</p>
-          ) : null}
+          <h2 className="mt-3 text-2xl font-semibold text-white">{tournament.title}</h2>
           <div className="mt-4 grid gap-2 text-sm text-[#aab4da] md:grid-cols-2">
             <p>สมัคร: {formatDateRange(tournament.registrationOpensAt, tournament.registrationClosesAt)}</p>
-            <p>แข่ง: {formatDateRange(tournament.eventStartsAt, tournament.eventEndsAt)}</p>
-            <p>สถานที่: {tournament.venueName || "-"}</p>
+            <p>แข่ง: {formatEventDate(tournament)}</p>
+            <p>สถานที่: {tournament.venueAddress || tournament.venueName || "-"}</p>
             <p>PromptPay: {tournament.promptpayName || tournament.promptpayId || "-"}</p>
           </div>
         </div>
@@ -147,4 +144,14 @@ function formatDateRange(start: string | null, end: string | null) {
   }
 
   return `${formatDate(start)} - ${formatDate(end)}`;
+}
+
+function formatEventDate(tournament: TournamentRecord) {
+  if (tournament.eventDate) {
+    return new Intl.DateTimeFormat("th-TH", {
+      dateStyle: "medium",
+    }).format(new Date(`${tournament.eventDate}T00:00:00.000Z`));
+  }
+
+  return formatDateRange(tournament.eventStartsAt, tournament.eventEndsAt);
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays, MapPin, Ticket } from "lucide-react";
@@ -22,7 +23,7 @@ export default async function TournamentDetailPage({
   const canRegister = tournament.status === "open";
 
   return (
-    <MobileShell title={tournament.titleTh} subtitle={tournament.titleEn ?? "รายละเอียดรายการแข่งขัน"}>
+    <MobileShell title={tournament.title} subtitle="รายละเอียดรายการแข่งขัน">
       <div className="grid gap-4">
         <Link
           href="/tournaments"
@@ -31,6 +32,18 @@ export default async function TournamentDetailPage({
           <ArrowLeft className="h-4 w-4" aria-hidden />
           กลับรายการแข่งขัน
         </Link>
+
+        {tournament.bannerUrl ? (
+          <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-[#27345b] bg-[#0a1128]">
+            <Image
+              src={tournament.bannerUrl}
+              alt={tournament.bannerAlt ?? tournament.title}
+              fill
+              sizes="(max-width: 430px) 100vw, 430px"
+              className="object-cover"
+            />
+          </div>
+        ) : null}
 
         <section className="rounded-2xl border border-[#27345b] bg-[#101832] p-4">
           <div className="flex items-center justify-between gap-3">
@@ -49,18 +62,23 @@ export default async function TournamentDetailPage({
             <InfoLine
               icon={<CalendarDays className="h-4 w-4" aria-hidden />}
               label="แข่งขัน"
-              value={formatDateRange(tournament.eventStartsAt, tournament.eventEndsAt)}
+              value={formatEventDate(tournament)}
             />
             <InfoLine
               icon={<MapPin className="h-4 w-4" aria-hidden />}
               label="สถานที่"
-              value={tournament.venueName || "ยังไม่ระบุสถานที่"}
+              value={tournament.venueAddress || tournament.venueName || "ยังไม่ระบุสถานที่"}
             />
           </div>
-          {tournament.venueAddress ? (
-            <p className="mt-3 rounded-xl border border-[#27345b] bg-[#0a1128] p-3 text-xs leading-5 text-[#8390bd]">
-              {tournament.venueAddress}
-            </p>
+          {tournament.googleMapsUrl ? (
+            <a
+              href={tournament.googleMapsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[#27345b] px-4 py-2 text-sm font-semibold text-[#dce3ff] transition hover:border-[#6c72ff] hover:text-white"
+            >
+              เปิด Google Maps
+            </a>
           ) : null}
         </section>
 
@@ -182,8 +200,22 @@ function formatDateRange(start: string | null, end: string | null) {
 
 function formatNumberRange(min: number | null, max: number | null) {
   if (min === null && max === null) {
-    return "ไม่จำกัด";
+    return "Open";
   }
 
-  return `${min ?? "ต่ำสุด"} - ${max ?? "สูงสุด"}`;
+  return `${min ?? "Open"} - ${max ?? "Open"}`;
+}
+
+function formatEventDate(tournament: {
+  eventDate: string | null;
+  eventStartsAt: string | null;
+  eventEndsAt: string | null;
+}) {
+  if (tournament.eventDate) {
+    return new Intl.DateTimeFormat("th-TH", {
+      dateStyle: "medium",
+    }).format(new Date(`${tournament.eventDate}T00:00:00.000Z`));
+  }
+
+  return formatDateRange(tournament.eventStartsAt, tournament.eventEndsAt);
 }

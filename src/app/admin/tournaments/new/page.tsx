@@ -19,7 +19,7 @@ export default function NewTournamentPage() {
           สร้างรายการแข่งขัน
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[#8390bd]">
-          สร้างเป็น draft ก่อน จากนั้นเข้าไปเพิ่ม divisions และ promo codes
+          กรอกรายละเอียดรายการและเพิ่มหลายรุ่นการแข่งขันได้ในฟอร์มเดียว
         </p>
       </header>
 

@@ -1,5 +1,10 @@
+import { Buffer } from "node:buffer";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerComponentClient } from "@/lib/supabase/server";
+
+const TOURNAMENT_BANNER_BUCKET = "tournament-banners";
+const MAX_BANNER_BYTES = 2 * 1024 * 1024;
+const ALLOWED_BANNER_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export type TournamentStatus =
   | "draft"
@@ -14,11 +19,13 @@ export type PromoDiscountType = "free" | "percentage" | "fixed";
 
 export type TournamentRecord = {
   id: string;
-  titleTh: string;
+  title: string;
   titleEn: string | null;
   description: string | null;
   venueName: string | null;
   venueAddress: string | null;
+  googleMapsUrl: string | null;
+  eventDate: string | null;
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
   eventStartsAt: string | null;
@@ -79,15 +86,13 @@ export type TournamentDetail = TournamentRecord & {
 };
 
 export type TournamentInput = {
-  titleTh: string;
-  titleEn: string | null;
+  title: string;
   description: string | null;
-  venueName: string | null;
   venueAddress: string | null;
+  googleMapsUrl: string | null;
+  eventDate: string | null;
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
-  eventStartsAt: string | null;
-  eventEndsAt: string | null;
   promptpayId: string | null;
   promptpayName: string | null;
   bannerUrl: string | null;
@@ -95,6 +100,7 @@ export type TournamentInput = {
 };
 
 export type DivisionInput = {
+  id?: string;
   name: string;
   description: string | null;
   feeAmount: number;
@@ -125,11 +131,14 @@ export type PromoCodeInput = {
 
 type TournamentRow = {
   id: string;
-  title_th: string;
+  title?: string | null;
+  title_th?: string | null;
   title_en: string | null;
   description: string | null;
   venue_name: string | null;
   venue_address: string | null;
+  google_maps_url?: string | null;
+  event_date?: string | null;
   registration_opens_at: string | null;
   registration_closes_at: string | null;
   event_starts_at: string | null;
@@ -182,6 +191,13 @@ type PromoCodeRow = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+};
+
+type AdminSupabaseClient = ReturnType<typeof createSupabaseAdminClient>;
+
+type UploadedBanner = {
+  path: string;
+  publicUrl: string;
 };
 
 export async function getAdminTournaments() {
@@ -307,6 +323,43 @@ export async function createTournament(input: TournamentInput) {
   return (data as { id: string }).id;
 }
 
+export async function createTournamentWithDivisions(
+  input: TournamentInput,
+  divisions: DivisionInput[],
+  bannerFile?: File | null,
+) {
+  ensureAdminMutationAllowedForDevMode();
+
+  const supabase = createSupabaseAdminClient();
+  const tournamentId = crypto.randomUUID();
+  let uploadedBanner: UploadedBanner | null = null;
+
+  try {
+    uploadedBanner = await maybeUploadTournamentBanner(supabase, tournamentId, bannerFile);
+    const finalInput = withUploadedBanner(input, uploadedBanner);
+    const { data, error } = await supabase
+      .from("tournaments")
+      .insert({ id: tournamentId, ...toTournamentMutation(finalInput) })
+      .select("id")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    await insertTournamentDivisions(supabase, tournamentId, divisions);
+
+    return (data as { id: string }).id;
+  } catch (error) {
+    if (uploadedBanner) {
+      await supabase.storage.from(TOURNAMENT_BANNER_BUCKET).remove([uploadedBanner.path]);
+    }
+
+    await supabase.from("tournaments").delete().eq("id", tournamentId);
+    throw error;
+  }
+}
+
 export async function updateTournament(id: string, input: TournamentInput) {
   ensureAdminMutationAllowedForDevMode();
 
@@ -317,6 +370,37 @@ export async function updateTournament(id: string, input: TournamentInput) {
     .eq("id", id);
 
   if (error) {
+    throw error;
+  }
+}
+
+export async function updateTournamentWithDivisions(
+  id: string,
+  input: TournamentInput,
+  divisions: DivisionInput[],
+  bannerFile?: File | null,
+) {
+  ensureAdminMutationAllowedForDevMode();
+
+  const supabase = createSupabaseAdminClient();
+  const uploadedBanner = await maybeUploadTournamentBanner(supabase, id, bannerFile);
+
+  try {
+    const { error } = await supabase
+      .from("tournaments")
+      .update(toTournamentMutation(withUploadedBanner(input, uploadedBanner)))
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    await replaceTournamentDivisions(supabase, id, divisions);
+  } catch (error) {
+    if (uploadedBanner) {
+      await supabase.storage.from(TOURNAMENT_BANNER_BUCKET).remove([uploadedBanner.path]);
+    }
+
     throw error;
   }
 }
@@ -401,22 +485,7 @@ export async function upsertDivision(
   ensureAdminMutationAllowedForDevMode();
 
   const supabase = createSupabaseAdminClient();
-  const mutation = {
-    name: input.name,
-    description: input.description,
-    fee_amount: input.feeAmount,
-    max_players: input.maxPlayers,
-    min_power_level: input.minPowerLevel,
-    max_power_level: input.maxPowerLevel,
-    min_age: input.minAge,
-    max_age: input.maxAge,
-    time_slot_label: input.timeSlotLabel,
-    starts_at: input.startsAt,
-    ends_at: input.endsAt,
-    pairing_method: input.pairingMethod,
-    status: input.status,
-    sort_order: input.sortOrder,
-  };
+  const mutation = toDivisionMutation(input);
 
   const query = divisionId
     ? supabase
@@ -489,17 +558,164 @@ export function ensureAdminMutationAllowedForDevMode() {
   // TODO(prod-auth): require the normal Supabase Auth user to have account_roles.admin = active.
 }
 
-function toTournamentMutation(input: TournamentInput) {
+async function insertTournamentDivisions(
+  supabase: AdminSupabaseClient,
+  tournamentId: string,
+  divisions: DivisionInput[],
+) {
+  if (divisions.length === 0) {
+    return;
+  }
+
+  const rows = divisions.map((division, index) => ({
+    ...toDivisionMutation({ ...division, sortOrder: index }),
+    tournament_id: tournamentId,
+  }));
+  const { error } = await supabase.from("divisions").insert(rows);
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function replaceTournamentDivisions(
+  supabase: AdminSupabaseClient,
+  tournamentId: string,
+  divisions: DivisionInput[],
+) {
+  const { data: existingRows, error: existingError } = await supabase
+    .from("divisions")
+    .select("id")
+    .eq("tournament_id", tournamentId);
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  const existingIds = new Set(((existingRows ?? []) as { id: string }[]).map((row) => row.id));
+  const keptIds = new Set<string>();
+
+  for (const [index, division] of divisions.entries()) {
+    const mutation = toDivisionMutation({ ...division, sortOrder: index });
+
+    if (division.id && existingIds.has(division.id)) {
+      const { error } = await supabase
+        .from("divisions")
+        .update(mutation)
+        .eq("id", division.id)
+        .eq("tournament_id", tournamentId);
+
+      if (error) {
+        throw error;
+      }
+
+      keptIds.add(division.id);
+      continue;
+    }
+
+    const { data, error } = await supabase
+      .from("divisions")
+      .insert({ ...mutation, tournament_id: tournamentId })
+      .select("id")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    keptIds.add((data as { id: string }).id);
+  }
+
+  const staleIds = [...existingIds].filter((id) => !keptIds.has(id));
+  if (staleIds.length === 0) {
+    return;
+  }
+
+  const { error: deleteError } = await supabase
+    .from("divisions")
+    .delete()
+    .eq("tournament_id", tournamentId)
+    .in("id", staleIds);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+}
+
+async function maybeUploadTournamentBanner(
+  supabase: AdminSupabaseClient,
+  tournamentId: string,
+  bannerFile?: File | null,
+): Promise<UploadedBanner | null> {
+  if (!bannerFile || bannerFile.size === 0) {
+    return null;
+  }
+
+  if (!ALLOWED_BANNER_TYPES.has(bannerFile.type)) {
+    throw new Error("Banner image must be JPG, PNG, or WebP.");
+  }
+
+  if (bannerFile.size > MAX_BANNER_BYTES) {
+    throw new Error("Banner image must be 2MB or smaller.");
+  }
+
+  const extension = getBannerExtension(bannerFile);
+  const path = `${tournamentId}/${crypto.randomUUID()}.${extension}`;
+  const bytes = Buffer.from(await bannerFile.arrayBuffer());
+  const { error } = await supabase.storage.from(TOURNAMENT_BANNER_BUCKET).upload(path, bytes, {
+    contentType: bannerFile.type,
+    upsert: false,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const { data } = supabase.storage.from(TOURNAMENT_BANNER_BUCKET).getPublicUrl(path);
   return {
-    title_th: input.titleTh,
-    title_en: input.titleEn,
+    path,
+    publicUrl: data.publicUrl,
+  };
+}
+
+function withUploadedBanner(input: TournamentInput, uploadedBanner: UploadedBanner | null) {
+  if (!uploadedBanner) {
+    return input;
+  }
+
+  return {
+    ...input,
+    bannerUrl: uploadedBanner.publicUrl,
+    bannerAlt: input.bannerAlt ?? input.title,
+  };
+}
+
+function getBannerExtension(file: File) {
+  if (file.type === "image/png") {
+    return "png";
+  }
+
+  if (file.type === "image/webp") {
+    return "webp";
+  }
+
+  return "jpg";
+}
+
+function toTournamentMutation(input: TournamentInput) {
+  const eventStartsAt = input.eventDate ? new Date(`${input.eventDate}T00:00:00.000Z`).toISOString() : null;
+
+  return {
+    title: input.title,
     description: input.description,
-    venue_name: input.venueName,
+    venue_name: null,
     venue_address: input.venueAddress,
+    google_maps_url: input.googleMapsUrl,
+    event_date: input.eventDate,
     registration_opens_at: input.registrationOpensAt,
     registration_closes_at: input.registrationClosesAt,
-    event_starts_at: input.eventStartsAt,
-    event_ends_at: input.eventEndsAt,
+    event_starts_at: eventStartsAt,
+    event_ends_at: null,
     promptpay_id: input.promptpayId,
     promptpay_name: input.promptpayName,
     banner_url: input.bannerUrl,
@@ -507,14 +723,37 @@ function toTournamentMutation(input: TournamentInput) {
   };
 }
 
+function toDivisionMutation(input: DivisionInput) {
+  return {
+    name: input.name,
+    description: input.description,
+    fee_amount: input.feeAmount,
+    max_players: input.maxPlayers,
+    min_power_level: input.minPowerLevel,
+    max_power_level: input.maxPowerLevel,
+    min_age: input.minAge,
+    max_age: input.maxAge,
+    time_slot_label: input.timeSlotLabel,
+    starts_at: input.startsAt,
+    ends_at: input.endsAt,
+    pairing_method: input.pairingMethod,
+    status: input.status,
+    sort_order: input.sortOrder,
+  };
+}
+
 function mapTournament(row: TournamentRow): TournamentRecord {
+  const title = row.title ?? row.title_th ?? row.title_en ?? "Untitled tournament";
+
   return {
     id: row.id,
-    titleTh: row.title_th,
+    title,
     titleEn: row.title_en,
     description: row.description,
     venueName: row.venue_name,
     venueAddress: row.venue_address,
+    googleMapsUrl: row.google_maps_url ?? null,
+    eventDate: row.event_date ?? null,
     registrationOpensAt: row.registration_opens_at,
     registrationClosesAt: row.registration_closes_at,
     eventStartsAt: row.event_starts_at,

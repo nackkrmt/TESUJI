@@ -1,7 +1,21 @@
 import type { NextConfig } from "next";
 
+const supabaseStorageHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+  : null;
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: supabaseStorageHost
+      ? [
+          {
+            protocol: "https",
+            hostname: supabaseStorageHost,
+            pathname: "/storage/v1/object/public/tournament-banners/**",
+          },
+        ]
+      : [],
+  },
 };
 
 export default nextConfig;

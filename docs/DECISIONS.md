@@ -1,6 +1,6 @@
 # TESUJI Locked Decisions
 
-Last updated: 2026-06-01
+Last updated: 2026-06-04
 
 ## Product Decisions
 
@@ -56,3 +56,13 @@ Last updated: 2026-06-01
 - Migrations are the source of truth for schema.
 - Server admin mutations require `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`.
 - Do not store secrets in repo-tracked files.
+
+## Tournament Admin
+
+- Admin tournament creation is a single form for event details plus multiple divisions; do not return to a required draft-first/add-divisions-later flow.
+- Tournament name is stored/displayed as one `title`, not separate TH/EN tournament titles.
+- Tournament event date and registration open/close date portions should use the same wheel-picker date pattern as registration; registration times use dropdowns.
+- Tournament banner uploads use public Supabase Storage bucket `tournament-banners`; store the public URL in `tournaments.banner_url`.
+- Blank division power or age bounds mean Open and must be saved as `NULL`, not `0`.
+- Admin division power/age bounds should be chosen from dropdowns, with Open as the empty value.
+- Division time slot labels are `เช้า`, `บ่าย`, and `เต็มวัน`.

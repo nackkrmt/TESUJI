@@ -53,24 +53,40 @@ function formatDisplay(value: string): string {
 }
 
 export function WheelDatePicker({
+  buttonClassName = inputClassName,
+  defaultYear,
+  maxYear,
+  minYear,
+  placeholder = "วว/ดด/ปปปป",
+  sheetTitle = "เลือกวันเกิด",
   value,
   onChange,
 }: {
+  buttonClassName?: string;
+  defaultYear?: number;
+  maxYear?: number;
+  minYear?: number;
+  placeholder?: string;
+  sheetTitle?: string;
   value: string;
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
+  const minSelectableYear = minYear ?? currentYear - 100;
+  const maxSelectableYear = maxYear ?? currentYear;
+  const fallbackYear = defaultYear ?? currentYear - 20;
+  const clampYear = (year: number) => Math.min(maxSelectableYear, Math.max(minSelectableYear, year));
   const years = useMemo(() => {
     const list: number[] = [];
-    for (let year = currentYear; year >= currentYear - 100; year -= 1) {
+    for (let year = maxSelectableYear; year >= minSelectableYear; year -= 1) {
       list.push(year);
     }
     return list;
-  }, [currentYear]);
+  }, [maxSelectableYear, minSelectableYear]);
 
   const parsed = parseDate(value);
-  const [draftYear, setDraftYear] = useState(parsed?.y ?? currentYear - 20);
+  const [draftYear, setDraftYear] = useState(clampYear(parsed?.y ?? fallbackYear));
   const [draftMonth, setDraftMonth] = useState(parsed?.m ?? 1);
   const [draftDay, setDraftDay] = useState(parsed?.d ?? 1);
 
@@ -83,7 +99,7 @@ export function WheelDatePicker({
 
   function openSheet() {
     const current = parseDate(value);
-    setDraftYear(current?.y ?? currentYear - 20);
+    setDraftYear(clampYear(current?.y ?? fallbackYear));
     setDraftMonth(current?.m ?? 1);
     setDraftDay(current?.d ?? 1);
     setOpen(true);
@@ -101,10 +117,10 @@ export function WheelDatePicker({
       <button
         type="button"
         onClick={openSheet}
-        className={`${inputClassName} flex items-center justify-between text-left`}
+        className={`${buttonClassName} flex items-center justify-between text-left`}
       >
         <span className={display ? "text-white" : "text-[#526087]"}>
-          {display || "วว/ดด/ปปปป"}
+          {display || placeholder}
         </span>
         <CalendarDays className="h-4 w-4 shrink-0 text-[#7480aa]" aria-hidden />
       </button>
@@ -119,7 +135,7 @@ export function WheelDatePicker({
           />
           <div className="relative w-full max-w-[430px] rounded-t-[28px] border border-[#202a49] bg-[#0c142d] p-5 pb-7">
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[#27345b]" />
-            <p className="mb-4 text-center text-sm font-semibold text-white">เลือกวันเกิด</p>
+            <p className="mb-4 text-center text-sm font-semibold text-white">{sheetTitle}</p>
 
             <div className="relative grid grid-cols-[1fr_1.4fr_1fr] gap-2">
               {/* center selection band */}
@@ -142,7 +158,7 @@ export function WheelDatePicker({
               <WheelColumn
                 ariaLabel="ปี (ค.ศ.)"
                 items={years.map((year) => String(year))}
-                selectedIndex={years.indexOf(draftYear)}
+                selectedIndex={Math.max(0, years.indexOf(draftYear))}
                 onSelect={(index) => setDraftYear(years[index])}
               />
             </div>

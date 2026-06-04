@@ -44,6 +44,7 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606020001_role_management.sql`
   - `202606030001_coach_player_links.sql`
   - `202606040001_tournament_admin.sql`
+  - `202606040002_refactor_tournament_creation.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
@@ -75,11 +76,14 @@ This is the short, current-state handoff for agents switching between Codex and 
   - Coach sees approved linked players separately from pending/rejected requests.
 - Sprint 4 Tournament CRUD foundation exists:
   - Migration `202606040001_tournament_admin.sql` creates `tournaments`, `divisions`, and `promo_codes`.
+  - Migration `202606040002_refactor_tournament_creation.sql` refactors tournament creation fields (`title`, `event_date`, `google_maps_url`), creates the public `tournament-banners` Storage bucket, and keeps division power/age ranges nullable for Open.
   - Admin tournament routes use real Supabase data via trusted server actions/service layer.
-  - Admin can create draft tournaments, edit tournament details, change status, delete draft tournaments, add/edit divisions, and add/edit promo codes.
+  - Admin can create/update a draft tournament and multiple divisions in one form, including banner upload to Supabase Storage.
+  - Admin tournament event date and registration open/close date portions use the shared `WheelDatePicker` pattern from registration; registration times use hour/minute dropdowns.
+  - Division power/age ranges are dropdowns with blank/Open saved as NULL.
+  - Admin can change status, delete draft tournaments, and add/edit promo codes.
   - Opening a tournament requires at least one active division.
-  - Public tournament list/detail read published non-draft tournament data from Supabase.
-  - Banner support is metadata-only in this slice (`banner_url` / `banner_alt`); storage upload/validation is not implemented yet.
+  - Public tournament list/detail read published non-draft tournament data from Supabase and display uploaded banners when present.
 - Public/auth UX is mobile-frame only:
   - `/login`
   - `/register`
@@ -137,9 +141,10 @@ Test emails were `codex-e2e-...@example.com`.
   - Server page listing real tournaments from Supabase.
   - Dev mode decision applies here too: do not add route-level Admin access protection yet.
 - `/admin/tournaments/new`
-  - Creates a draft tournament through `createTournamentAction`.
+  - Creates a draft tournament plus inline divisions through `createTournamentAction`.
+  - Accepts banner uploads through the `tournament-banners` public Storage bucket and stores the resulting public URL in `banner_url`.
 - `/admin/tournaments/[id]`
-  - Edits tournament details, status, divisions, and promo codes.
+  - Edits tournament details and divisions together in `TournamentForm`; status and promo codes remain separate action forms.
   - Server actions return typed `{ status, message, id? }` results for form UX.
   - Future Admin protection seam lives in `ensureAdminMutationAllowedForDevMode()` and must later check `account_roles.admin = active`.
 - `/referee/invite`
@@ -171,6 +176,7 @@ Test emails were `codex-e2e-...@example.com`.
 - Rank search RPC now returns evidence fields such as `year_promoted`, `rating`, `category`, `rank_award`, `event_name`, and `event_date`.
 - Tournament writes currently go through service-role server actions in dev mode with no route-level Admin guard by design.
 - Tournament public read RLS exposes non-draft tournaments/divisions; promo code reads are future-gated to active Admin accounts and currently managed through service-role admin actions.
+- Tournament banners use Supabase Storage bucket `tournament-banners`, configured public with JPG/PNG/WebP and a 2MB file limit in migration `202606040002_refactor_tournament_creation.sql`.
 
 ## Dev Tooling
 
@@ -245,14 +251,13 @@ Verified on 2026-06-03 (Asia/Bangkok):
 
 Verified locally on 2026-06-04 (Asia/Bangkok):
 
-- `npm run lint` passed.
-- `npm run build` passed and Next lists `/admin/tournaments`, `/admin/tournaments/[id]`, `/admin/tournaments/new`, `/tournaments`, and `/tournaments/[id]`.
-- Supabase CLI migration dry-run was attempted with `npx supabase db push --dry-run --linked` but this session has no Supabase access token/login.
-- Remote Supabase currently returns `PGRST205` for `public.tournaments`, so the new migration still needs to be applied before browser CRUD smoke tests can pass against the real project.
-- Browser smoke opened `/tournaments`; it currently shows a server error because the remote migration is not applied yet.
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed and Next lists `/admin/tournaments`, `/admin/tournaments/[id]`, `/admin/tournaments/new`, `/tournaments`, and `/tournaments/[id]`.
+- Supabase CLI migration dry-run was attempted with `npx.cmd supabase db push --dry-run --linked` but this session has no Supabase access token/login.
+- Migration `202606040002_refactor_tournament_creation.sql` still needs to be pushed/verified against the real Supabase project before browser CRUD smoke tests can confirm banner upload and inline division creation.
 
 ## Recommended Next Task
 
-1. Finish Sprint 4 verification and remote migration push/reset if not already done.
+1. Push/verify tournament migrations through `202606040002_refactor_tournament_creation.sql`, then smoke test `/admin/tournaments/new` with banner upload and multiple divisions.
 2. Move to Sprint 5 Registration + Payment foundation.
 3. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.

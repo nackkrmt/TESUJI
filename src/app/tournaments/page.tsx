@@ -21,10 +21,7 @@ export default async function TournamentsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <StatusBadge status={tournament.status} />
-                  <h2 className="mt-3 text-xl font-semibold text-white">{tournament.titleTh}</h2>
-                  {tournament.titleEn ? (
-                    <p className="mt-1 text-sm text-[#8390bd]">{tournament.titleEn}</p>
-                  ) : null}
+                  <h2 className="mt-3 text-xl font-semibold text-white">{tournament.title}</h2>
                 </div>
                 <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-[#8390bd]" aria-hidden />
               </div>
@@ -32,11 +29,11 @@ export default async function TournamentsPage() {
               <div className="mt-4 grid gap-2 text-sm leading-6 text-[#aab4da]">
                 <p className="flex items-start gap-2">
                   <CalendarDays className="mt-1 h-4 w-4 shrink-0 text-[#8c91ff]" aria-hidden />
-                  {formatDateRange(tournament.eventStartsAt, tournament.eventEndsAt)}
+                  {formatEventDate(tournament)}
                 </p>
                 <p className="flex items-start gap-2">
                   <MapPin className="mt-1 h-4 w-4 shrink-0 text-[#8c91ff]" aria-hidden />
-                  {tournament.venueName || "ยังไม่ระบุสถานที่"}
+                  {tournament.venueAddress || tournament.venueName || "ยังไม่ระบุสถานที่"}
                 </p>
               </div>
             </Link>
@@ -85,4 +82,14 @@ function formatDateRange(start: string | null, end: string | null) {
   }
 
   return `${formatDate(start)} - ${formatDate(end)}`;
+}
+
+function formatEventDate(tournament: TournamentRecord) {
+  if (tournament.eventDate) {
+    return new Intl.DateTimeFormat("th-TH", {
+      dateStyle: "medium",
+    }).format(new Date(`${tournament.eventDate}T00:00:00.000Z`));
+  }
+
+  return formatDateRange(tournament.eventStartsAt, tournament.eventEndsAt);
 }
