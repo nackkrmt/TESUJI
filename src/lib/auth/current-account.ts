@@ -6,6 +6,7 @@ export type CurrentAccount = {
   phone: string;
   activeRole: string;
   roles: Array<{ role: string; status: string }>;
+  pendingRoleRequests: Array<{ requestedRole: string; status: string }>;
   profile: {
     id: string;
     nameTh: string;
@@ -25,6 +26,11 @@ type AccountRow = {
 
 type RoleRow = {
   role: string;
+  status: string;
+};
+
+type RoleRequestRow = {
+  requested_role: string;
   status: string;
 };
 
@@ -49,17 +55,23 @@ export async function getCurrentAccount(): Promise<CurrentAccount | null> {
     return null;
   }
 
-  const [{ data: account }, { data: roles }, { data: profile }] = await Promise.all([
-    supabase.from("accounts").select("id,email,phone,active_role").eq("id", user.id).maybeSingle(),
-    supabase.from("account_roles").select("role,status").eq("account_id", user.id),
-    supabase
-      .from("player_profiles")
-      .select(
-        "id,first_name_th,last_name_th,first_name_en,last_name_en,rank,rank_status,institute_name",
-      )
-      .eq("account_id", user.id)
-      .maybeSingle(),
-  ]);
+  const [{ data: account }, { data: roles }, { data: pendingRoleRequests }, { data: profile }] =
+    await Promise.all([
+      supabase.from("accounts").select("id,email,phone,active_role").eq("id", user.id).maybeSingle(),
+      supabase.from("account_roles").select("role,status").eq("account_id", user.id),
+      supabase
+        .from("role_requests")
+        .select("requested_role,status")
+        .eq("account_id", user.id)
+        .eq("status", "pending"),
+      supabase
+        .from("player_profiles")
+        .select(
+          "id,first_name_th,last_name_th,first_name_en,last_name_en,rank,rank_status,institute_name",
+        )
+        .eq("account_id", user.id)
+        .maybeSingle(),
+    ]);
 
   if (!account) {
     return null;
@@ -76,6 +88,10 @@ export async function getCurrentAccount(): Promise<CurrentAccount | null> {
     roles: ((roles ?? []) as RoleRow[]).map((role) => ({
       role: role.role,
       status: role.status,
+    })),
+    pendingRoleRequests: ((pendingRoleRequests ?? []) as RoleRequestRow[]).map((request) => ({
+      requestedRole: request.requested_role,
+      status: request.status,
     })),
     profile: profileRow
       ? {

@@ -1,6 +1,8 @@
 import type { CurrentAccount } from "@/lib/auth/current-account";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+type AdminSupabaseClient = ReturnType<typeof createSupabaseAdminClient>;
+
 export type CoachLinkStatus = "pending" | "approved" | "rejected" | "revoked";
 
 export type CoachLinkPerson = {
@@ -101,12 +103,12 @@ export async function getCoachLinkDashboard(
   ];
   const accountIds = Array.from(new Set(links.map((link) => link.coach_account_id)));
   const profileIds = Array.from(new Set(links.map((link) => link.player_profile_id)));
-  const playerProfileAccountIds = await getProfileAccountIds(profileIds);
+  const playerProfileAccountIds = await getProfileAccountIds(supabase, profileIds);
   const allAccountIds = Array.from(new Set([...accountIds, ...playerProfileAccountIds]));
   const [accountsById, profilesByAccountId, profilesById] = await Promise.all([
-    getAccountsById(allAccountIds),
-    getProfilesByAccountId(allAccountIds),
-    getProfilesById(profileIds),
+    getAccountsById(supabase, allAccountIds),
+    getProfilesByAccountId(supabase, allAccountIds),
+    getProfilesById(supabase, profileIds),
   ]);
 
   return {
@@ -119,12 +121,11 @@ export async function getCoachLinkDashboard(
   };
 }
 
-async function getProfileAccountIds(profileIds: string[]) {
+async function getProfileAccountIds(supabase: AdminSupabaseClient, profileIds: string[]) {
   if (profileIds.length === 0) {
     return [];
   }
 
-  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("player_profiles")
     .select("account_id")
@@ -137,12 +138,11 @@ async function getProfileAccountIds(profileIds: string[]) {
   return ((data ?? []) as Array<{ account_id: string }>).map((profile) => profile.account_id);
 }
 
-async function getAccountsById(accountIds: string[]) {
+async function getAccountsById(supabase: AdminSupabaseClient, accountIds: string[]) {
   if (accountIds.length === 0) {
     return new Map<string, AccountRow>();
   }
 
-  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("accounts")
     .select("id,email")
@@ -155,12 +155,11 @@ async function getAccountsById(accountIds: string[]) {
   return new Map(((data ?? []) as AccountRow[]).map((account) => [account.id, account]));
 }
 
-async function getProfilesByAccountId(accountIds: string[]) {
+async function getProfilesByAccountId(supabase: AdminSupabaseClient, accountIds: string[]) {
   if (accountIds.length === 0) {
     return new Map<string, ProfileRow>();
   }
 
-  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("player_profiles")
     .select(
@@ -175,12 +174,11 @@ async function getProfilesByAccountId(accountIds: string[]) {
   return new Map(((data ?? []) as ProfileRow[]).map((profile) => [profile.account_id, profile]));
 }
 
-async function getProfilesById(profileIds: string[]) {
+async function getProfilesById(supabase: AdminSupabaseClient, profileIds: string[]) {
   if (profileIds.length === 0) {
     return new Map<string, ProfileRow>();
   }
 
-  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("player_profiles")
     .select(

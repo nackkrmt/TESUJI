@@ -1,7 +1,3 @@
-import { execFile } from "node:child_process";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import { promisify } from "node:util";
-import { databaseDir } from "./database-config";
 import type { GoPlayerImportRow, GoPlayerSource } from "./excel-import";
 import { normalizeThaiName } from "./normalize-thai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -9,7 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 export type GoDatabaseSupabaseImportResult = {
   importedRows: number;
   syncedProfiles: number;
-  strategy: "supabase-js" | "supabase-cli";
+  strategy: "supabase-js";
 };
 
 type VerifiedProfileRow = {
@@ -32,23 +28,36 @@ type GoPlayerMatchRow = {
   rating: number | null;
 };
 
-const execFileAsync = promisify(execFile);
+type VerifiedProfileUpdate = {
+  profileId: string;
+  rank: string;
+  powerLevel: number;
+  rating: number | null;
+  matchedGoPlayerId: string;
+};
+
+const PROFILE_SYNC_BATCH_SIZE = 10;
 
 export async function replaceGoPlayerDatabaseSourceInSupabase(
   source: GoPlayerSource,
   rows: GoPlayerImportRow[],
 ): Promise<GoDatabaseSupabaseImportResult> {
   const payload = rowsToSupabasePayload(rows);
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("replace_go_player_database_source", {
+    p_source: source,
+    p_rows: payload,
+  });
 
-  try {
-    return await replaceWithSupabaseJs(source, payload);
-  } catch (error) {
-    if (process.env.SUPABASE_IMPORT_STRATEGY === "supabase-js") {
-      throw error;
-    }
-
-    return replaceWithSupabaseCli(source, payload);
+  if (error) {
+    throw error;
   }
+
+  return {
+    importedRows: typeof data === "number" ? data : payload.length,
+    syncedProfiles: await syncVerifiedProfilesFromGoDatabase(),
+    strategy: "supabase-js",
+  };
 }
 
 function rowsToSupabasePayload(rows: GoPlayerImportRow[]) {
@@ -71,88 +80,6 @@ function rowsToSupabasePayload(rows: GoPlayerImportRow[]) {
     event_date: row.event_date,
     raw_data: row.raw_data,
   }));
-}
-
-async function replaceWithSupabaseJs(
-  source: GoPlayerSource,
-  payload: ReturnType<typeof rowsToSupabasePayload>,
-): Promise<GoDatabaseSupabaseImportResult> {
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase.rpc("replace_go_player_database_source", {
-    p_source: source,
-    p_rows: payload,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return {
-    importedRows: typeof data === "number" ? data : payload.length,
-    syncedProfiles: await syncVerifiedProfilesFromGoDatabase(),
-    strategy: "supabase-js",
-  };
-}
-
-async function replaceWithSupabaseCli(
-  source: GoPlayerSource,
-  payload: ReturnType<typeof rowsToSupabasePayload>,
-): Promise<GoDatabaseSupabaseImportResult> {
-  const tempDir = `${databaseDir}/.uploads`;
-  const uploadId = `${Date.now()}-${source}`;
-  const sqlPath = `${tempDir}/${uploadId}.sql`;
-  const dollarQuoteTag = `tesuji_${uploadId.replace(/[^a-zA-Z0-9_]/g, "_")}`;
-  const sql = [
-    "select public.replace_go_player_database_source(",
-    `  '${source}',`,
-    `  $${dollarQuoteTag}$${JSON.stringify(payload)}$${dollarQuoteTag}$::jsonb`,
-    ") as imported_rows;",
-  ].join("\n");
-
-  await mkdir(tempDir, { recursive: true });
-  await writeFile(sqlPath, sql, "utf8");
-
-  try {
-    const command = process.platform === "win32" ? "cmd.exe" : "npx";
-    const cliSqlPath = process.platform === "win32" ? sqlPath.replace(/\//g, "\\") : sqlPath;
-    const args =
-      process.platform === "win32"
-        ? [
-            "/d",
-            "/s",
-            "/c",
-            `npx supabase db query --linked --file ${cliSqlPath} --output json`,
-          ]
-        : ["supabase", "db", "query", "--linked", "--file", cliSqlPath, "--output", "json"];
-    const { stdout, stderr } = await execFileAsync(
-      command,
-      args,
-      {
-        cwd: process.cwd(),
-        maxBuffer: 30 * 1024 * 1024,
-        windowsHide: true,
-      },
-    );
-    const importedRows = readImportedRowsFromCliOutput(stdout) ?? payload.length;
-
-    if (stderr.toLowerCase().includes("error")) {
-      throw new Error(stderr.trim());
-    }
-
-    return {
-      importedRows,
-      syncedProfiles: await syncVerifiedProfilesFromGoDatabase(),
-      strategy: "supabase-cli",
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Supabase CLI import failed: ${error.message}`);
-    }
-
-    throw error;
-  } finally {
-    await unlink(sqlPath).catch(() => undefined);
-  }
 }
 
 export async function syncVerifiedProfilesFromGoDatabase(): Promise<number> {
@@ -196,7 +123,7 @@ export async function syncVerifiedProfilesFromGoDatabase(): Promise<number> {
     }
   }
 
-  let syncedProfiles = 0;
+  const updates: VerifiedProfileUpdate[] = [];
 
   for (const profile of profiles as VerifiedProfileRow[]) {
     const key = getNormalizedNameKey(
@@ -219,25 +146,39 @@ export async function syncVerifiedProfilesFromGoDatabase(): Promise<number> {
       continue;
     }
 
-    const { error } = await supabase
-      .from("player_profiles")
-      .update({
-        rank: bestMatch.rank,
-        power_level: bestMatch.power_level,
-        rating: bestMatch.rating,
-        matched_go_player_id: bestMatch.id,
-        rank_status: "verified",
-      })
-      .eq("id", profile.id);
+    updates.push({
+      profileId: profile.id,
+      rank: bestMatch.rank,
+      powerLevel: bestMatch.power_level,
+      rating: bestMatch.rating,
+      matchedGoPlayerId: bestMatch.id,
+    });
+  }
+
+  for (let index = 0; index < updates.length; index += PROFILE_SYNC_BATCH_SIZE) {
+    const batch = updates.slice(index, index + PROFILE_SYNC_BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map((update) =>
+        supabase
+          .from("player_profiles")
+          .update({
+            rank: update.rank,
+            power_level: update.powerLevel,
+            rating: update.rating,
+            matched_go_player_id: update.matchedGoPlayerId,
+            rank_status: "verified",
+          })
+          .eq("id", update.profileId),
+      ),
+    );
+    const error = results.find((result) => result.error)?.error;
 
     if (error) {
       throw error;
     }
-
-    syncedProfiles += 1;
   }
 
-  return syncedProfiles;
+  return updates.length;
 }
 
 function getNormalizedNameKey(firstName: string, lastName: string): string {
@@ -264,13 +205,4 @@ function compareGoPlayerMatches(a: GoPlayerMatchRow, b: GoPlayerMatchRow): numbe
 
 function getSourcePriority(source: GoPlayerSource): number {
   return source === "dan" ? 1 : 2;
-}
-
-function readImportedRowsFromCliOutput(output: string): number | null {
-  try {
-    const parsed = JSON.parse(output) as { rows?: Array<{ imported_rows?: number }> };
-    return parsed.rows?.[0]?.imported_rows ?? null;
-  } catch {
-    return null;
-  }
 }

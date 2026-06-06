@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { matchGoPlayerRank } from "@/lib/go/rank-matching";
-import { supabase } from "@/lib/supabase/client";
+import { createSupabaseServerComponentClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const supabase = await createSupabaseServerComponentClient();
     const result = await matchGoPlayerRank(
       supabase,
       parsed.data.firstNameTh,

@@ -22,7 +22,7 @@ export function DatabaseUploadForm({
   const [fileName, setFileName] = useState("");
   const [state, setState] = useState<UploadState>({
     status: "idle",
-    message: "เลือกไฟล์ .xlsx แล้วระบบจะตรวจ schema ก่อนแทนที่ไฟล์เดิม",
+    message: "เลือกไฟล์ .xlsx แล้วระบบจะตรวจ schema และ import เข้า Supabase โดยตรง",
   });
   const [isPending, startTransition] = useTransition();
 
@@ -62,7 +62,7 @@ export function DatabaseUploadForm({
 
       setState({
         status: "success",
-        message: `เข้า Supabase แล้ว: ${result.supabaseImportedRows?.toLocaleString("th-TH")} rows, ${result.skippedRows?.toLocaleString("th-TH")} skip, sync ${result.syncedProfiles?.toLocaleString("th-TH") ?? "0"} profiles`,
+        message: `เข้า Supabase แล้ว: ${formatNumber(result.supabaseImportedRows ?? 0)} rows, ${formatNumber(result.skippedRows ?? 0)} skip, sync ${formatNumber(result.syncedProfiles ?? 0)} profiles`,
       });
       setFileName("");
 
@@ -110,8 +110,8 @@ export function DatabaseUploadForm({
               setState({
                 status: "idle",
                 message: file
-                  ? `พร้อมอัปโหลด ${file.name}`
-                  : "เลือกไฟล์ .xlsx แล้วระบบจะตรวจ schema ก่อนแทนที่ไฟล์เดิม",
+                  ? `พร้อมอัปโหลด ${file.name} เพื่อ import เข้า Supabase`
+                  : "เลือกไฟล์ .xlsx แล้วระบบจะตรวจ schema และ import เข้า Supabase โดยตรง",
               });
             }}
           />
@@ -132,4 +132,8 @@ export function DatabaseUploadForm({
       </div>
     </div>
   );
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }

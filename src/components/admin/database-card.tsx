@@ -1,14 +1,19 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Clock3, FileSpreadsheet } from "lucide-react";
-import type { GoDatabaseUploadStatus } from "@/lib/go/upload-status";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Database,
+  FileSpreadsheet,
+} from "lucide-react";
+import type { DatabaseImportRun } from "@/lib/database/import-runs";
 
 type DatabaseCardProps = {
   label: string;
-  filePath: string;
+  fileName: string;
   error?: string;
-  latestUpload: GoDatabaseUploadStatus | null;
-  lastModifiedAt: string | null;
-  fileSizeBytes: number | null;
+  latestUpload: DatabaseImportRun | null;
+  supabaseRows: number;
   importableRows: number;
   skippedRows: number;
   skipReasons: Array<{ reason: string; count: number }>;
@@ -25,11 +30,10 @@ type DatabaseCardProps = {
 
 export function DatabaseCard({
   label,
-  filePath,
+  fileName,
   error,
   latestUpload,
-  lastModifiedAt,
-  fileSizeBytes,
+  supabaseRows,
   importableRows,
   skippedRows,
   skipReasons,
@@ -39,6 +43,20 @@ export function DatabaseCard({
   hasSamples,
   samplesTable,
 }: DatabaseCardProps) {
+  const latestImportFailed = latestUpload?.status === "error";
+  const statusFailed = Boolean(error) || latestImportFailed;
+  const latestImportDetail = latestUpload
+    ? [
+        `${formatNumber(latestUpload.importableRows)} พร้อม import`,
+        `${formatNumber(latestUpload.skippedRows)} skip`,
+        latestUpload.syncedProfiles !== null
+          ? `${formatNumber(latestUpload.syncedProfiles)} synced profiles`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    : "สถานะล่าสุดจะถูกบันทึกใน database_import_runs";
+
   return (
     <article className="rounded-lg border border-[#202a49] bg-[#101832]">
       <div className="grid gap-5 border-b border-[#202a49] p-5 xl:grid-cols-[1fr_420px]">
@@ -49,21 +67,32 @@ export function DatabaseCard({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">{label}</h2>
-              <p className="mt-1 break-all text-xs text-[#7480aa]">{filePath}</p>
+              <p className="mt-1 text-xs text-[#7480aa]">
+                อัปโหลดไฟล์ {fileName} แล้ว import เข้า Supabase โดยตรง
+              </p>
             </div>
             <span
               className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                error ? "bg-[#4a1724] text-[#ff8fa3]" : "bg-[#073d36] text-[#42e0b3]"
+                statusFailed ? "bg-[#4a1724] text-[#ff8fa3]" : "bg-[#073d36] text-[#42e0b3]"
               }`}
             >
-              {error ? (
+              {statusFailed ? (
                 <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
               ) : (
                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
               )}
-              {error ? "อ่านไฟล์ไม่สำเร็จ" : "อ่านไฟล์สำเร็จ"}
+              {statusFailed ? "ต้องตรวจสอบ" : "พร้อมใช้งานจาก Supabase"}
             </span>
           </div>
+
+          {error || latestUpload?.errorMessage ? (
+            <p
+              role="alert"
+              className="mt-4 rounded-md border border-[#4a1724] bg-[#2a1020] p-3 text-sm leading-6 text-[#ffb0bd]"
+            >
+              {error ?? latestUpload?.errorMessage}
+            </p>
+          ) : null}
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <StatusBlock
@@ -72,20 +101,19 @@ export function DatabaseCard({
               detail={latestUpload?.originalFileName ?? "ไม่มีประวัติ upload"}
             />
             <StatusBlock
-              label="Supabase ล่าสุด"
-              value={
-                latestUpload
-                  ? `${(
-                      latestUpload.supabaseImportedRows ?? latestUpload.importableRows
-                    ).toLocaleString("th-TH")} ${supabaseUnit}`
-                  : "ยังไม่เคย import"
-              }
+              icon={<Database className="h-3.5 w-3.5" aria-hidden />}
+              label="Supabase ปัจจุบัน"
+              value={`${formatNumber(supabaseRows)} ${supabaseUnit}`}
               detail={supabaseDetail}
             />
             <StatusBlock
-              label="ไฟล์ต้นทางแก้ไขล่าสุด"
-              value={formatDateTime(lastModifiedAt)}
-              detail={formatBytes(fileSizeBytes)}
+              label="ผล import ล่าสุด"
+              value={
+                latestUpload
+                  ? `${formatNumber(latestUpload.supabaseImportedRows)} imported`
+                  : "ยังไม่เคย import"
+              }
+              detail={latestImportDetail}
             />
           </div>
         </div>
@@ -100,12 +128,12 @@ export function DatabaseCard({
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-[#dce3ff]">ตัวอย่างข้อมูล</h3>
-          {hasSamples ? samplesTable : <EmptyPanel text="ยังไม่มี row ที่อ่านได้" />}
+          <h3 className="text-sm font-semibold text-[#dce3ff]">ตัวอย่างข้อมูลจาก Supabase</h3>
+          {hasSamples ? samplesTable : <EmptyPanel text="ยังไม่มี row จาก Supabase" />}
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-[#dce3ff]">เหตุผลที่ skip</h3>
+          <h3 className="text-sm font-semibold text-[#dce3ff]">เหตุผลที่ skip จาก import ล่าสุด</h3>
           {skipReasons.length === 0 ? (
             <EmptyPanel text="ไม่มี row ที่ถูก skip" />
           ) : (
@@ -116,9 +144,7 @@ export function DatabaseCard({
                   className="flex items-center justify-between gap-4 rounded-md border border-[#27345b] bg-[#0a1128] px-3 py-2 text-sm"
                 >
                   <span className="text-[#aab4da]">{reason.reason}</span>
-                  <span className="font-semibold text-white">
-                    {reason.count.toLocaleString("th-TH")}
-                  </span>
+                  <span className="font-semibold text-white">{formatNumber(reason.count)}</span>
                 </div>
               ))}
             </div>
@@ -130,10 +156,12 @@ export function DatabaseCard({
 }
 
 function StatusBlock({
+  icon = <Clock3 className="h-3.5 w-3.5" aria-hidden />,
   label,
   value,
   detail,
 }: {
+  icon?: ReactNode;
   label: string;
   value: string;
   detail: string;
@@ -141,7 +169,7 @@ function StatusBlock({
   return (
     <div className="rounded-md border border-[#27345b] bg-[#0a1128] p-4">
       <div className="flex items-center gap-2 text-xs font-semibold text-[#8390bd]">
-        <Clock3 className="h-3.5 w-3.5" aria-hidden />
+        {icon}
         {label}
       </div>
       <p className="mt-3 text-sm font-semibold text-white">{value}</p>
@@ -165,7 +193,7 @@ function CountPanel({
   return (
     <div className="rounded-md border border-[#27345b] bg-[#0a1128] p-4">
       <span className={`rounded-full px-2 py-1 text-xs font-semibold ${toneClass}`}>{label}</span>
-      <p className="mt-4 text-3xl font-semibold text-white">{value.toLocaleString("th-TH")}</p>
+      <p className="mt-4 text-3xl font-semibold text-white">{formatNumber(value)}</p>
     </div>
   );
 }
@@ -190,14 +218,6 @@ function formatDateTime(value: string | null): string {
   }).format(new Date(value));
 }
 
-function formatBytes(value: number | null): string {
-  if (!value) {
-    return "ไม่มีขนาดไฟล์";
-  }
-
-  if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(1)} KB`;
-  }
-
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { forgotPasswordSchema } from "@/lib/auth/schemas";
-import { supabase } from "@/lib/supabase/client";
+import { createSupabaseServerComponentClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +11,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "อีเมลไม่ถูกต้อง" }, { status: 400 });
   }
 
-  const origin = request.headers.get("origin") ?? "http://127.0.0.1:3000";
+  const origin = request.headers.get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://127.0.0.1:3000";
   const redirectTo = `${origin}/auth/callback?next=/reset-password`;
+  const supabase = await createSupabaseServerComponentClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo,
   });

@@ -36,6 +36,7 @@ This version has breaking changes - APIs, conventions, and file structure may al
 - Supabase migrations live in `supabase/migrations`.
 - Prefer transactional RPC/server-route flows for identity/signup/admin mutations.
 - Windows dev env: `python3` here is a non-functional Microsoft Store stub — always call Python as `python` (3.14.x), not `python3`.
+- Go and school database imports are upload-only through `/admin/database`; do not add production paths that depend on a local database folder.
 - UI/UX design skill (Claude Code) installed at `.claude/skills/ui-ux-pro-max/`. Run from repo root, e.g. `python .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system`. Codex won't auto-load this Claude-only skill folder but can run the script directly. A `uipro update` may overwrite `SKILL.md` and revert the in-file `python3`->`python` fix.
 
 ## Verification
@@ -45,12 +46,6 @@ Run these after meaningful changes:
 ```bash
 npm run lint
 npm run build
-```
-
-For Go database parser/import work:
-
-```bash
-npm run inspect:go-db
 ```
 
 Common local dev command:

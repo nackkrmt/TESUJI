@@ -23,24 +23,25 @@ export type ParsedSchoolWorkbook = {
 };
 
 type RawSheetRow = Record<string, unknown>;
+export type SchoolWorkbookInput = string | ArrayBuffer;
 
 const requiredColumns = ["seq", "name", "keywords"];
 
-export async function validateSchoolWorkbookHeaders(filePath: string): Promise<string[]> {
-  const { headers } = await readFirstWorksheet(filePath);
+export async function validateSchoolWorkbookHeaders(input: SchoolWorkbookInput): Promise<string[]> {
+  const { headers } = await readFirstWorksheet(input);
   const headerSet = new Set(headers);
 
   return requiredColumns.filter((column) => !headerSet.has(column));
 }
 
-export async function parseSchoolWorkbook(filePath: string): Promise<ParsedSchoolWorkbook> {
-  const missingColumns = await validateSchoolWorkbookHeaders(filePath);
+export async function parseSchoolWorkbook(input: SchoolWorkbookInput): Promise<ParsedSchoolWorkbook> {
+  const missingColumns = await validateSchoolWorkbookHeaders(input);
 
   if (missingColumns.length > 0) {
     throw new Error(`SCHOOL missing columns: ${missingColumns.join(", ")}`);
   }
 
-  const { rows: rawRows } = await readFirstWorksheet(filePath);
+  const { rows: rawRows } = await readFirstWorksheet(input);
   const byName = new Map<string, SchoolImportRow>();
   const skippedRows: SkippedSchoolImportRow[] = [];
 
@@ -80,17 +81,22 @@ export async function parseSchoolWorkbook(filePath: string): Promise<ParsedSchoo
   };
 }
 
-async function readFirstWorksheet(filePath: string): Promise<{
+async function readFirstWorksheet(input: SchoolWorkbookInput): Promise<{
   headers: string[];
   rows: RawSheetRow[];
 }> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(filePath);
+
+  if (typeof input === "string") {
+    await workbook.xlsx.readFile(input);
+  } else {
+    await workbook.xlsx.load(input);
+  }
 
   const worksheet = workbook.worksheets[0];
 
   if (!worksheet) {
-    throw new Error(`Workbook has no worksheets: ${filePath}`);
+    throw new Error("Workbook has no worksheets.");
   }
 
   const headerRow = worksheet.getRow(1);

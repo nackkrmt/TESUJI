@@ -32,9 +32,8 @@ export default async function Home() {
   const activeRoles = account.roles.filter((role) => role.status === "active");
   const isActiveAdmin = activeRoles.some((role) => role.role === "admin");
   const isActiveCoach = activeRoles.some((role) => role.role === "coach");
-  const isActiveReferee = activeRoles.some((role) => role.role === "referee");
-  const hasPendingCoachRole = account.roles.some(
-    (role) => role.role === "coach" && role.status === "pending",
+  const hasPendingCoachRole = account.pendingRoleRequests.some(
+    (request) => request.requestedRole === "coach",
   );
   const incomingPendingCount = coachLinks.incomingLinks.filter(
     (link) => link.status === "pending",
@@ -46,19 +45,17 @@ export default async function Home() {
     {
       description:
         incomingPendingCount > 0
-          ? `มีคำขอ Coach Link รออยู่ ${incomingPendingCount.toLocaleString("th-TH")} รายการ`
+          ? `มีคำขอ Coach Link รออยู่ ${String(incomingPendingCount)} รายการ`
           : "ดูข้อมูลโปรไฟล์และจัดการ Coach Link",
       href: "/profile",
       icon: <UserRound className="h-5 w-5" aria-hidden />,
       label: "โปรไฟล์",
     },
     {
-      description: isActiveReferee
-        ? "บัญชีนี้มีสิทธิ์กรรมการแล้ว"
-        : "กรอกรหัสเชิญจาก Admin เพื่อรับสิทธิ์กรรมการ",
-      href: "/referee/invite",
-      icon: <ShieldCheck className="h-5 w-5" aria-hidden />,
-      label: isActiveReferee ? "Referee" : "รหัสกรรมการ",
+      description: "ดูรายการแข่งขันที่เปิดรับสมัครและรายละเอียดรุ่นแข่งขัน",
+      href: "/tournaments",
+      icon: <Trophy className="h-5 w-5" aria-hidden />,
+      label: "ดูรายการ",
     },
     isActiveAdmin
       ? {
@@ -77,7 +74,7 @@ export default async function Home() {
         },
     {
       description: isActiveCoach
-        ? `${approvedLinkedPlayers.length.toLocaleString("th-TH")} linked players ที่อนุมัติแล้ว`
+        ? `${String(approvedLinkedPlayers.length)} linked players ที่อนุมัติแล้ว`
         : "อนุมัติหรือปฏิเสธคำขอเชื่อมจาก Coach",
       href: "/profile",
       icon: <UserRound className="h-5 w-5" aria-hidden />,
@@ -132,7 +129,7 @@ export default async function Home() {
                 </p>
               </div>
               <span className="rounded-full border border-[#27345b] px-2.5 py-1 text-xs font-semibold text-[#aab4da]">
-                {approvedLinkedPlayers.length.toLocaleString("th-TH")}
+                {String(approvedLinkedPlayers.length)}
               </span>
             </div>
 

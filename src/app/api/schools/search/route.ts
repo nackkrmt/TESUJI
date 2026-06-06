@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { searchSchoolDatabase } from "@/lib/school/search";
-import { supabase } from "@/lib/supabase/client";
+import { createSupabaseServerComponentClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +26,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    const supabase = await createSupabaseServerComponentClient();
     const results = await searchSchoolDatabase(supabase, parsed.data.q, parsed.data.limit);
     return NextResponse.json({ results });
   } catch (error) {

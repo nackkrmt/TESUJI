@@ -6,9 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "inspect:go-db": "tsx scripts/inspect-go-databases.ts",
-    "import:go-db": "tsx scripts/import-go-databases.ts"
+    "lint": "eslint"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

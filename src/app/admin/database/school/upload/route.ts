@@ -1,16 +1,13 @@
-import { copyFile, mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import {
-  getSchoolDatabaseFilePath,
-  schoolDatabaseDir,
-  schoolDatabaseFileName,
-} from "@/lib/school/database-config";
+import { countSkipReasons, tryRecordDatabaseImportRun } from "@/lib/database/import-runs";
+import { schoolDatabaseFileName } from "@/lib/school/database-config";
 import { parseSchoolWorkbook } from "@/lib/school/excel-import";
 import { replaceSchoolDatabaseInSupabase } from "@/lib/school/supabase-import";
-import { writeGoDatabaseUploadStatus } from "@/lib/go/upload-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const MAX_EXCEL_BYTES = 10 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -24,47 +21,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Only .xlsx files are supported." }, { status: 400 });
   }
 
-  const targetPath = getSchoolDatabaseFilePath();
-  const uploadId = `${Date.now()}-school`;
-  const tempDir = `${schoolDatabaseDir}/.uploads`;
-  const tempPath = `${tempDir}/${uploadId}.xlsx`;
+  if (file.size > MAX_EXCEL_BYTES) {
+    return NextResponse.json(
+      { error: "Excel files must be 10MB or smaller." },
+      { status: 400 },
+    );
+  }
 
   try {
-    await mkdir(tempDir, { recursive: true });
-    await mkdir(`${schoolDatabaseDir}/backups`, { recursive: true });
-    await writeFile(tempPath, Buffer.from(await file.arrayBuffer()));
-
-    const parsed = await parseSchoolWorkbook(tempPath);
+    const parsed = await parseSchoolWorkbook(await file.arrayBuffer());
 
     if (parsed.importedRows.length === 0) {
+      await tryRecordDatabaseImportRun({
+        source: "school",
+        status: "error",
+        originalFileName: file.name,
+        importableRows: 0,
+        skippedRows: parsed.skippedRows.length,
+        supabaseImportedRows: 0,
+        skipReasons: countSkipReasons(parsed.skippedRows),
+        errorMessage: "Parser did not find any importable school rows in this file.",
+      });
+
       return NextResponse.json(
         { error: "Parser did not find any importable school rows in this file." },
         { status: 422 },
       );
     }
 
-    const existingFile = await stat(targetPath).catch(() => null);
-
-    if (existingFile) {
-      const backupStamp = new Date().toISOString().replace(/[:.]/g, "-");
-      await copyFile(targetPath, `${schoolDatabaseDir}/backups/${backupStamp}-${schoolDatabaseFileName}`);
-    }
-
     const supabaseImport = await replaceSchoolDatabaseInSupabase(parsed.importedRows);
 
-    await copyFile(tempPath, targetPath);
-    await writeGoDatabaseUploadStatus(
-      {
-        source: "school",
-        uploadedAt: new Date().toISOString(),
-        originalFileName: file.name,
-        importableRows: parsed.importedRows.length,
-        skippedRows: parsed.skippedRows.length,
-        supabaseImportedRows: supabaseImport.importedRows,
-        supabaseStrategy: supabaseImport.strategy,
-      },
-      schoolDatabaseDir,
-    );
+    await tryRecordDatabaseImportRun({
+      source: "school",
+      status: "success",
+      originalFileName: file.name,
+      importableRows: parsed.importedRows.length,
+      skippedRows: parsed.skippedRows.length,
+      supabaseImportedRows: supabaseImport.importedRows,
+      supabaseStrategy: supabaseImport.strategy,
+      skipReasons: countSkipReasons(parsed.skippedRows),
+    });
 
     return NextResponse.json({
       ok: true,
@@ -76,9 +72,17 @@ export async function POST(request: Request) {
       supabaseStrategy: supabaseImport.strategy,
     });
   } catch (error) {
+    await tryRecordDatabaseImportRun({
+      source: "school",
+      status: "error",
+      originalFileName: file.name,
+      importableRows: 0,
+      skippedRows: 0,
+      supabaseImportedRows: 0,
+      errorMessage: getErrorMessage(error),
+    });
+
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 422 });
-  } finally {
-    await unlink(tempPath).catch(() => undefined);
   }
 }
 

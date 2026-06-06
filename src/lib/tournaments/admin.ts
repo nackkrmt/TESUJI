@@ -703,7 +703,7 @@ function getBannerExtension(file: File) {
 }
 
 function toTournamentMutation(input: TournamentInput) {
-  const eventStartsAt = input.eventDate ? new Date(`${input.eventDate}T00:00:00.000Z`).toISOString() : null;
+  const eventStartsAt = input.eventDate ? new Date(`${input.eventDate}T00:00:00+07:00`).toISOString() : null;
 
   return {
     title: input.title,

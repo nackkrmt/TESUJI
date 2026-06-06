@@ -1,6 +1,6 @@
 # TESUJI Locked Decisions
 
-Last updated: 2026-06-04
+Last updated: 2026-06-06
 
 ## Product Decisions
 
@@ -47,6 +47,8 @@ Last updated: 2026-06-04
 - `rank_award` must be 1, 2, or 3 to import.
 - DAN has priority over KYU/AWARD in rank matching.
 - If KYU and AWARD both match, choose the higher `power_level`.
+- Go and school database imports are upload-only through Admin Database. Production paths must not depend on a fixed local folder or local workbook cache.
+- Latest import audit/status is stored in Supabase `database_import_runs`.
 
 ## Supabase
 

@@ -40,6 +40,7 @@ export type ParsedGoPlayerWorkbook = {
 };
 
 type RawSheetRow = Record<string, unknown>;
+export type GoPlayerWorkbookInput = string | ArrayBuffer;
 
 const requiredColumns: Record<GoPlayerSource, string[]> = {
   dan: ["seq", "prefix", "firstname", "lastname", "year", "rank", "diamond", "gat"],
@@ -60,26 +61,26 @@ const requiredColumns: Record<GoPlayerSource, string[]> = {
 };
 
 export async function validateGoPlayerWorkbookHeaders(
-  filePath: string,
+  input: GoPlayerWorkbookInput,
   source: GoPlayerSource,
 ): Promise<string[]> {
-  const { headers } = await readFirstWorksheet(filePath);
+  const { headers } = await readFirstWorksheet(input);
   const headerSet = new Set(headers);
 
   return requiredColumns[source].filter((column) => !headerSet.has(column));
 }
 
 export async function parseGoPlayerWorkbook(
-  filePath: string,
+  input: GoPlayerWorkbookInput,
   source: GoPlayerSource,
 ): Promise<ParsedGoPlayerWorkbook> {
-  const missingColumns = await validateGoPlayerWorkbookHeaders(filePath, source);
+  const missingColumns = await validateGoPlayerWorkbookHeaders(input, source);
 
   if (missingColumns.length > 0) {
     throw new Error(`${source.toUpperCase()} missing columns: ${missingColumns.join(", ")}`);
   }
 
-  const { rows: rawRows } = await readFirstWorksheet(filePath);
+  const { rows: rawRows } = await readFirstWorksheet(input);
 
   if (source === "dan") {
     return parseDanRows(rawRows);
@@ -92,17 +93,22 @@ export async function parseGoPlayerWorkbook(
   return parseAwardRows(rawRows);
 }
 
-async function readFirstWorksheet(filePath: string): Promise<{
+async function readFirstWorksheet(input: GoPlayerWorkbookInput): Promise<{
   headers: string[];
   rows: RawSheetRow[];
 }> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(filePath);
+
+  if (typeof input === "string") {
+    await workbook.xlsx.readFile(input);
+  } else {
+    await workbook.xlsx.load(input);
+  }
 
   const worksheet = workbook.worksheets[0];
 
   if (!worksheet) {
-    throw new Error(`Workbook has no worksheets: ${filePath}`);
+    throw new Error("Workbook has no worksheets.");
   }
 
   const headerRow = worksheet.getRow(1);

@@ -15,7 +15,7 @@ export function SchoolDatabaseUploadForm() {
   const [fileName, setFileName] = useState("");
   const [state, setState] = useState<UploadState>({
     status: "idle",
-    message: "เลือกไฟล์ .xlsx ที่มีคอลัมน์ seq, name, keywords แล้วระบบจะ import เข้า Supabase",
+    message: "เลือกไฟล์ .xlsx ที่มีคอลัมน์ seq, name, keywords แล้วระบบจะ import เข้า Supabase โดยตรง",
   });
   const [isPending, startTransition] = useTransition();
 
@@ -53,7 +53,7 @@ export function SchoolDatabaseUploadForm() {
 
       setState({
         status: "success",
-        message: `เข้า Supabase แล้ว: ${result.supabaseImportedRows?.toLocaleString("th-TH")} schools, ${result.skippedRows?.toLocaleString("th-TH")} skip`,
+        message: `เข้า Supabase แล้ว: ${formatNumber(result.supabaseImportedRows ?? 0)} schools, ${formatNumber(result.skippedRows ?? 0)} skip`,
       });
       setFileName("");
 
@@ -101,8 +101,8 @@ export function SchoolDatabaseUploadForm() {
               setState({
                 status: "idle",
                 message: file
-                  ? `พร้อมอัปโหลด ${file.name}`
-                  : "เลือกไฟล์ .xlsx ที่มีคอลัมน์ seq, name, keywords แล้วระบบจะ import เข้า Supabase",
+                  ? `พร้อมอัปโหลด ${file.name} เพื่อ import เข้า Supabase`
+                  : "เลือกไฟล์ .xlsx ที่มีคอลัมน์ seq, name, keywords แล้วระบบจะ import เข้า Supabase โดยตรง",
               });
             }}
           />
@@ -123,4 +123,8 @@ export function SchoolDatabaseUploadForm() {
       </div>
     </div>
   );
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }

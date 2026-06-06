@@ -33,7 +33,7 @@ export async function createDigitalIdQrDataUrl(account: CurrentAccount) {
     activeRoles: account.roles
       .filter((role) => role.status === "active")
       .map((role) => role.role),
-    issuedAt: new Date().toISOString(),
+    issuedAt: getHourlyIssuedAt(),
   };
 
   return QRCode.toDataURL(JSON.stringify(payload), {
@@ -45,4 +45,10 @@ export async function createDigitalIdQrDataUrl(account: CurrentAccount) {
     margin: 1,
     width: 320,
   });
+}
+
+function getHourlyIssuedAt() {
+  const issuedAt = new Date();
+  issuedAt.setMinutes(0, 0, 0);
+  return issuedAt.toISOString();
 }

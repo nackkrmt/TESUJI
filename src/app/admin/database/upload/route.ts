@@ -1,14 +1,14 @@
-import { copyFile, mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import { databaseDir, getGoDatabaseFilePath, getGoDatabaseSourceFile } from "@/lib/go/database-config";
+import { countSkipReasons, tryRecordDatabaseImportRun } from "@/lib/database/import-runs";
+import { getGoDatabaseSourceFile } from "@/lib/go/database-config";
 import { parseGoPlayerWorkbook, type GoPlayerSource } from "@/lib/go/excel-import";
 import { replaceGoPlayerDatabaseSourceInSupabase } from "@/lib/go/supabase-import";
-import { writeGoDatabaseUploadStatus } from "@/lib/go/upload-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const validSources = new Set<GoPlayerSource>(["dan", "kyu", "award"]);
+const MAX_EXCEL_BYTES = 10 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -27,31 +27,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Only .xlsx files are supported." }, { status: 400 });
   }
 
+  if (file.size > MAX_EXCEL_BYTES) {
+    return NextResponse.json(
+      { error: "Excel files must be 10MB or smaller." },
+      { status: 400 },
+    );
+  }
+
   const sourceFile = getGoDatabaseSourceFile(source);
-  const targetPath = getGoDatabaseFilePath(source);
-  const uploadId = `${Date.now()}-${source}`;
-  const tempDir = `${databaseDir}/.uploads`;
-  const tempPath = `${tempDir}/${uploadId}.xlsx`;
 
   try {
-    await mkdir(tempDir, { recursive: true });
-    await mkdir(`${databaseDir}/backups`, { recursive: true });
-    await writeFile(tempPath, Buffer.from(await file.arrayBuffer()));
-
-    const parsed = await parseGoPlayerWorkbook(tempPath, source);
+    const parsed = await parseGoPlayerWorkbook(await file.arrayBuffer(), source);
 
     if (parsed.importedRows.length === 0) {
+      await tryRecordDatabaseImportRun({
+        source,
+        status: "error",
+        originalFileName: file.name,
+        importableRows: 0,
+        skippedRows: parsed.skippedRows.length,
+        supabaseImportedRows: 0,
+        skipReasons: countSkipReasons(parsed.skippedRows),
+        errorMessage: "Parser did not find any importable rows in this file.",
+      });
+
       return NextResponse.json(
         { error: "Parser did not find any importable rows in this file." },
         { status: 422 },
       );
-    }
-
-    const existingFile = await stat(targetPath).catch(() => null);
-
-    if (existingFile) {
-      const backupStamp = new Date().toISOString().replace(/[:.]/g, "-");
-      await copyFile(targetPath, `${databaseDir}/backups/${backupStamp}-${sourceFile.fileName}`);
     }
 
     const supabaseImport = await replaceGoPlayerDatabaseSourceInSupabase(
@@ -59,16 +62,16 @@ export async function POST(request: Request) {
       parsed.importedRows,
     );
 
-    await copyFile(tempPath, targetPath);
-    await writeGoDatabaseUploadStatus({
+    await tryRecordDatabaseImportRun({
       source,
-      uploadedAt: new Date().toISOString(),
+      status: "success",
       originalFileName: file.name,
       importableRows: parsed.importedRows.length,
       skippedRows: parsed.skippedRows.length,
       supabaseImportedRows: supabaseImport.importedRows,
       syncedProfiles: supabaseImport.syncedProfiles,
       supabaseStrategy: supabaseImport.strategy,
+      skipReasons: countSkipReasons(parsed.skippedRows),
     });
 
     return NextResponse.json({
@@ -82,12 +85,20 @@ export async function POST(request: Request) {
       supabaseStrategy: supabaseImport.strategy,
     });
   } catch (error) {
+    await tryRecordDatabaseImportRun({
+      source,
+      status: "error",
+      originalFileName: file.name,
+      importableRows: 0,
+      skippedRows: 0,
+      supabaseImportedRows: 0,
+      errorMessage: getErrorMessage(error),
+    });
+
     return NextResponse.json(
       { error: getErrorMessage(error) },
       { status: 422 },
     );
-  } finally {
-    await unlink(tempPath).catch(() => undefined);
   }
 }
 

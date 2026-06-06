@@ -20,8 +20,8 @@ export default async function AdminDatabasePage() {
           อัปโหลดฐานข้อมูลผู้เล่นและสถาบัน
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[#8390bd]">
-          ใช้สำหรับอัปโหลดไฟล์ DAN, KYU, AWARD (ผู้เล่น) และ SCHOOL (สถาบัน) เข้าโฟลเดอร์ฐานข้อมูลจริง
-          ระบบจะอ่านไฟล์ด้วย parser เดียวกับ import script ก่อนแทนที่ไฟล์เดิมและ import เข้า Supabase
+          อัปโหลดไฟล์ DAN, KYU, AWARD และ SCHOOL ผ่านหน้า Admin นี้เท่านั้น
+          ระบบจะอ่านไฟล์ที่เลือกด้วย parser เดียวกัน แล้ว import เข้า Supabase โดยตรงโดยไม่อ้างอิงโฟลเดอร์ในเครื่อง
         </p>
       </header>
 
@@ -30,16 +30,15 @@ export default async function AdminDatabasePage() {
           <DatabaseCard
             key={summary.source}
             label={summary.label}
-            filePath={summary.filePath}
+            fileName={summary.fileName}
             error={summary.error}
             latestUpload={summary.latestUpload}
-            lastModifiedAt={summary.lastModifiedAt}
-            fileSizeBytes={summary.fileSizeBytes}
+            supabaseRows={summary.supabaseRows}
             importableRows={summary.importableRows}
             skippedRows={summary.skippedRows}
             skipReasons={summary.skipReasons}
             supabaseUnit="rows"
-            supabaseDetail="แทนข้อมูล source เดิมบน cloud"
+            supabaseDetail="ข้อมูลจริงที่ใช้ค้นหา rank และ sync โปรไฟล์"
             uploadForm={<DatabaseUploadForm source={summary.source} label={summary.label} />}
             hasSamples={summary.samples.length > 0}
             samplesTable={
@@ -69,16 +68,15 @@ export default async function AdminDatabasePage() {
 
         <DatabaseCard
           label={schoolSummary.label}
-          filePath={schoolSummary.filePath}
+          fileName={schoolSummary.fileName}
           error={schoolSummary.error}
           latestUpload={schoolSummary.latestUpload}
-          lastModifiedAt={schoolSummary.lastModifiedAt}
-          fileSizeBytes={schoolSummary.fileSizeBytes}
+          supabaseRows={schoolSummary.supabaseRows}
           importableRows={schoolSummary.importableRows}
           skippedRows={schoolSummary.skippedRows}
           skipReasons={schoolSummary.skipReasons}
           supabaseUnit="schools"
-          supabaseDetail="แทนข้อมูล school เดิมบน cloud"
+          supabaseDetail="ข้อมูลจริงที่ใช้ autocomplete ช่องสถาบัน"
           uploadForm={<SchoolDatabaseUploadForm />}
           hasSamples={schoolSummary.samples.length > 0}
           samplesTable={

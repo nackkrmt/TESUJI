@@ -1,6 +1,6 @@
 # TESUJI AI Handoff
 
-Last updated: 2026-06-04
+Last updated: 2026-06-06
 
 This is the short, current-state handoff for agents switching between Codex and Claude.
 
@@ -30,6 +30,7 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `player_profiles`
   - `coach_player_links`
   - `school_database`
+  - `database_import_runs`
   - `tournaments`
   - `divisions`
   - `promo_codes`
@@ -45,21 +46,23 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606030001_coach_player_links.sql`
   - `202606040001_tournament_admin.sql`
   - `202606040002_refactor_tournament_creation.sql`
+  - `202606060001_database_import_runs.sql`
+  - `202606060002_fix_school_replace_delete_where.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
 
 - Admin dashboard dark UI exists at `/admin`.
 - Admin Database page exists at `/admin/database`.
-- Admin Database upload supports DAN/KYU/AWARD Excel files and imports parsed rows to Supabase.
+- Admin Database upload supports DAN/KYU/AWARD Excel files and imports parsed rows directly from the uploaded file bytes to Supabase.
 - Go DB upload now re-syncs already verified Player Profiles after each import. Verified profiles are rematched by normalized Thai first/last name against the current `go_player_database`, with DAN priority over KYU/AWARD and then highest `power_level`; matching rows update `rank`, `power_level`, `rating`, and `matched_go_player_id`.
-- Admin Database upload also supports `SCHOOL_Database.xlsx` with columns `seq`, `name`, `keywords`; it imports to `school_database`.
-- Go DB parser reads real files from `D:/Programming/Database` by default.
+- Admin Database upload also supports `SCHOOL_Database.xlsx` with columns `seq`, `name`, `keywords`; it imports directly from the uploaded file bytes to `school_database`.
+- Go and school database production paths are upload-only and must not depend on a fixed local folder. Latest upload status lives in `database_import_runs`, not `.tesuji-upload-status.json`.
 - `go_player_database` currently has 3,762 rows:
   - DAN: 1,142
   - KYU: 1,635
   - AWARD: 985
-- `school_database` currently has 3 rows from `D:/Programming/Database/SCHOOL_Database.xlsx`.
+- `school_database` currently has 3 rows from the latest Admin upload.
 - Rank search API exists at `POST /api/rank/search`.
 - School search API exists at `GET /api/schools/search?q=...`.
 - Admin role-management page exists at `/admin/roles`:
@@ -184,7 +187,33 @@ Test emails were `codex-e2e-...@example.com`.
 - UI/UX design helper skill (Claude Code) installed project-local at `.claude/skills/ui-ux-pro-max/` on 2026-06-01. Invoke from repo root: `python .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system`. Claude-only skill folder; Codex can still run the script directly.
 - Auth UI a11y/UX pass (2026-06-01, guided by the ui-ux-pro-max review): shared input/button classes in `src/components/mobile/mobile-shell.tsx` now carry visible `focus-visible` rings + `cursor-pointer`; `globals.css` adds a global cursor-pointer base rule (Tailwind v4 drops the default button pointer) + a `prefers-reduced-motion` guard; root layout loads **Noto Sans Thai** for Thai glyphs (Geist is latin-only, so Thai text was falling back). `/login` is now a real `<form>` (Enter submits) with show/hide password, a loading spinner, and `role="alert"` errors; the register wizard got the same focus/cursor/loading/password-toggle + `role="alert"` treatment **without** changing its 4-step flow, fields, or components. `/forgot-password` and `/reset-password` now follow the same pattern too (real `<form>` + Enter-submit, `role`-tagged messages — `status` for the forgot-password success vs `alert` for errors — loading spinner, and show/hide toggles on both reset-password fields). Reuse the shared classes for any new auth inputs/buttons.
 - School DB upload/autocomplete pass (2026-06-01): migration `202606010006_school_database.sql` creates `school_database`, `replace_school_database(jsonb)`, and `search_school_database(text, integer)`. Admin upload route is `/admin/database/school/upload`; register uses `src/components/auth/institute-search-field.tsx`.
+- Upload-only DB pass (2026-06-06): migration `202606060001_database_import_runs.sql` creates `database_import_runs`. `/admin/database` reads Supabase row counts/samples and latest upload audit from Supabase; upload routes parse uploaded `.xlsx` bytes directly and no longer save, back up, or inspect files from a local database directory. Migration `202606060002_fix_school_replace_delete_where.sql` keeps `replace_school_database(jsonb)` compatible with Supabase safe-update rules by using an explicit `where true` delete.
 - Do NOT run `npm run build` while a `next dev` server is live on the same folder — both write `.next/` and the running dev server then serves mismatched SSR/client bundles → hydration errors (e.g. on `/register`). Stop dev first, or to recover: kill the dev server, delete `.next`, restart dev (no code change needed).
+
+## Code Review Fix Verification
+
+Verified on 2026-06-07 (Asia/Bangkok):
+
+- Home pending Coach state now reads pending `role_requests`.
+- Public API routes use the cookie-aware Supabase server client instead of the deleted `src/lib/supabase/client.ts` singleton.
+- Coach Link dashboard reuses one admin client per request.
+- Excel uploads reject files over 10MB before parsing.
+- Forgot-password redirects can fall back to `NEXT_PUBLIC_SITE_URL`.
+- Tournament date-only mutations use Bangkok midnight.
+- Digital ID QR `issuedAt` is rounded to the hour.
+- Verified profile sync updates in batches of 10.
+- Home Quick Access includes `/tournaments`.
+- `npm.cmd run lint` and `npx.cmd tsc --noEmit` passed.
+
+## Antigravity Accidental Revert Repair
+
+Verified on 2026-06-07 (Asia/Bangkok):
+
+- `src/components/admin/database-card.tsx` was restored to the upload-only Admin Database contract after an external `git checkout --` reverted it to the old local-file UI.
+- Admin Database cards no longer reference `src/lib/go/upload-status.ts`, `filePath`, local modified time, or local file size.
+- Go and SCHOOL upload form copy now says uploaded Excel files are imported directly into Supabase, not used to replace a local workbook.
+- `npm.cmd run lint` and `npx.cmd tsc --noEmit` passed.
+- Browser smoke checks for `/admin/database`, `/admin/tournaments`, and `/tournaments` showed no visible runtime error text or console errors. `/admin/database` shows Supabase status/upload-only text and no local file workflow markers.
 
 ## Environment
 
@@ -204,7 +233,6 @@ Do not copy real secret values into docs, commits, or chat.
 ```bash
 npm run lint
 npm run build
-npm run inspect:go-db
 ```
 
 Run dev server:
@@ -249,15 +277,22 @@ Verified on 2026-06-03 (Asia/Bangkok):
 
 ## Tournament CRUD Verification
 
-Verified locally on 2026-06-04 (Asia/Bangkok):
+Verified locally and against remote Supabase on 2026-06-06 (Asia/Bangkok):
 
 - `npm.cmd run lint` passed.
 - `npm.cmd run build` passed and Next lists `/admin/tournaments`, `/admin/tournaments/[id]`, `/admin/tournaments/new`, `/tournaments`, and `/tournaments/[id]`.
-- Supabase CLI migration dry-run was attempted with `npx.cmd supabase db push --dry-run --linked` but this session has no Supabase access token/login.
-- Migration `202606040002_refactor_tournament_creation.sql` still needs to be pushed/verified against the real Supabase project before browser CRUD smoke tests can confirm banner upload and inline division creation.
+- `npx.cmd supabase db push --linked --yes` applied:
+  - `202606040001_tournament_admin.sql`
+  - `202606040002_refactor_tournament_creation.sql`
+  - `202606060001_database_import_runs.sql`
+  - `202606060002_fix_school_replace_delete_where.sql`
+- `/admin/tournaments` no longer shows the missing-table warning after migration push.
+- Browser smoke test created draft tournament `Smoke Test Tournament 2026-06-06T08-39-06-920Z` with division `Open Division`, changed it to `open`, verified it appears on `/tournaments` and `/tournaments/[id]`, then deleted the smoke tournament so it no longer appears publicly.
+- Full smoke test on 2026-06-06 uploaded DAN/KYU/AWARD/SCHOOL workbooks through the Admin multipart routes. Latest counts: DAN 1,142, KYU 1,635, AWARD 985, SCHOOL 3. `database_import_runs` recorded success for all four sources; rank search and school autocomplete returned real Supabase results.
+- Banner upload was smoke-tested with `Logo/Tesuji_Logo-01.png`; the file was stored in `tournament-banners`, public URL and Next image optimizer returned image/png, then the smoke tournament and storage object were deleted.
+- `/admin/database`, `/admin/tournaments`, `/tournaments`, auth redirects, and in-app browser console checks passed with no smoke data left behind.
 
 ## Recommended Next Task
 
-1. Push/verify tournament migrations through `202606040002_refactor_tournament_creation.sql`, then smoke test `/admin/tournaments/new` with banner upload and multiple divisions.
-2. Move to Sprint 5 Registration + Payment foundation.
-3. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.
+1. Move to Sprint 5 Registration + Payment foundation.
+2. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.

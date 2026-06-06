@@ -6,11 +6,6 @@ export type GoDatabaseSourceFile = {
   fileName: string;
 };
 
-export const databaseDir = (process.env.GO_DATABASE_DIR ?? "D:/Programming/Database").replace(
-  /[\\/]$/,
-  "",
-);
-
 export const goDatabaseSourceFiles: GoDatabaseSourceFile[] = [
   { source: "dan", label: "DAN", fileName: "DAN_Database.xlsx" },
   { source: "kyu", label: "KYU", fileName: "KYU_Database.xlsx" },
@@ -25,8 +20,4 @@ export function getGoDatabaseSourceFile(source: GoPlayerSource): GoDatabaseSourc
   }
 
   return sourceFile;
-}
-
-export function getGoDatabaseFilePath(source: GoPlayerSource): string {
-  return `${databaseDir}/${getGoDatabaseSourceFile(source).fileName}`;
 }
