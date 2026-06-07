@@ -1,6 +1,6 @@
 # TESUJI AI Handoff
 
-Last updated: 2026-06-06
+Last updated: 2026-06-08
 
 This is the short, current-state handoff for agents switching between Codex and Claude.
 
@@ -12,6 +12,7 @@ This is the short, current-state handoff for agents switching between Codex and 
 - Keep decisions that should not be re-litigated in `docs/DECISIONS.md`.
 - Do not put real secrets in markdown files, git commits, or chat summaries.
 - The project rule is no mockups for core behavior: each step should work against the real app/database before moving on.
+- Token-light rule: do not open `master_plan.md` as a whole file. Use `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, and the relevant `docs/plans/*.md` first; use `rg -n` to read only small `master_plan.md` excerpts when truly needed.
 
 ## Current State
 
@@ -48,6 +49,7 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606040002_refactor_tournament_creation.sql`
   - `202606060001_database_import_runs.sql`
   - `202606060002_fix_school_replace_delete_where.sql`
+  - `202606070001_registration_payment_foundation.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
@@ -180,6 +182,7 @@ Test emails were `codex-e2e-...@example.com`.
 - Tournament writes currently go through service-role server actions in dev mode with no route-level Admin guard by design.
 - Tournament public read RLS exposes non-draft tournaments/divisions; promo code reads are future-gated to active Admin accounts and currently managed through service-role admin actions.
 - Tournament banners use Supabase Storage bucket `tournament-banners`, configured public with JPG/PNG/WebP and a 2MB file limit in migration `202606040002_refactor_tournament_creation.sql`.
+- Sprint 5 S5.0 migration `202606070001_registration_payment_foundation.sql` creates `payment_orders`, `registrations`, `promo_code_usages`, and a private `slips` Storage bucket. It keeps registration/payment rows readable only to the owner, approved related Coach, or future Admin gate, and exposes public tournament registration availability only through aggregate view `division_registration_summary`.
 
 ## Dev Tooling
 
@@ -292,7 +295,21 @@ Verified locally and against remote Supabase on 2026-06-06 (Asia/Bangkok):
 - Banner upload was smoke-tested with `Logo/Tesuji_Logo-01.png`; the file was stored in `tournament-banners`, public URL and Next image optimizer returned image/png, then the smoke tournament and storage object were deleted.
 - `/admin/database`, `/admin/tournaments`, `/tournaments`, auth redirects, and in-app browser console checks passed with no smoke data left behind.
 
+## Sprint 5 Schema Foundation Verification
+
+Verified on 2026-06-08 (Asia/Bangkok):
+
+- `npx.cmd supabase db push --linked --yes` applied `202606070001_registration_payment_foundation.sql` to the linked Supabase project.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed after applying the migration.
+- Supabase service-client smoke check confirmed `payment_orders`, `registrations`, `promo_code_usages`, and `division_registration_summary` are queryable and currently empty.
+- Supabase Storage smoke check confirmed private bucket `slips` exists with 10MB file limit and `image/jpeg` + `image/png` MIME types.
+- RLS smoke test created a temporary open tournament/division plus registration/payment/promo usage, confirmed anon could not see rows from private tables, confirmed anon could see public aggregate `division_registration_summary`, then deleted the smoke data. Follow-up query found 0 remaining `Codex S5 RLS Smoke%` tournaments.
+- No TypeScript/source files changed, so `npm.cmd run lint` was not run for S5.0.
+
 ## Recommended Next Task
 
-1. Move to Sprint 5 Registration + Payment foundation.
+1. Continue to Sprint 5 slice S5.1 Registration Transaction.
+   - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, and `docs/plans/05_registration_payment_token_light_slices.md`.
+   - Extra read: local migration `supabase/migrations/202606070001_registration_payment_foundation.sql` plus the S5.1 files named in the slice plan.
+   - Next command can be: `Run Sprint 5 slice S5.1 from docs/plans/05_registration_payment_token_light_slices.md. Implement real registration transaction only; no UI yet.`
 2. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.

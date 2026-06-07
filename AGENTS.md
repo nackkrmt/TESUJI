@@ -6,8 +6,16 @@ Read this before making changes. This file is for Codex, Claude, and any coding 
 
 1. `docs/AI_HANDOFF.md` - current implementation state and next blockers.
 2. `docs/DECISIONS.md` - locked product/technical decisions.
-3. `master_plan.md` - full product plan, but prefer the handoff and decisions files when details conflict.
-4. Relevant `docs/plans/*.md` for subsystem-level planning.
+3. Relevant `docs/plans/*.md` for subsystem-level planning.
+4. `master_plan.md` only when the handoff, decisions, and subsystem plan do not answer the question.
+
+## Token-Light Context Rules
+
+- Do not open `master_plan.md` as a whole file. It is large and quickly burns context.
+- When `master_plan.md` is needed, use `rg -n "<keyword>" master_plan.md` first, then read only the small matching section.
+- For Sprint 5 work, default to reading only `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, and `docs/plans/05_registration_payment_token_light_slices.md`.
+- Prefer `docs/AI_HANDOFF.md` for current implementation state. Update it after meaningful work so the next agent does not need to reread broad plans.
+- Work in small slices. For registration/payment, start with schema/RPC/service behavior before UI.
 
 ## Project Rules
 

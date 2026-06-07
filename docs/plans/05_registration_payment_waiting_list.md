@@ -1,5 +1,7 @@
 # 05 Registration, Payment, And Waiting List
 
+Token-light note: for day-to-day Sprint 5 work, use `docs/plans/05_registration_payment_token_light_slices.md` first. Read this full subsystem plan only when a slice needs more detail.
+
 ## Objective
 
 ทำสมัครแข่งให้จบจริง: เลือก Player, validate รุ่น, ตัด quota, สร้าง payment order, อัปโหลดสลิป, Admin verify, cancel, timeout, waiting list
@@ -116,4 +118,3 @@ Registration submit must be one transaction:
 - Slip upload changes order/registration to pending_verify
 - Admin approve changes all linked registrations to confirmed
 - Timeout expires order and promotes first waiting-list row
-
