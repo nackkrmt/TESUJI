@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
             hostname: supabaseStorageHost,
             pathname: "/storage/v1/object/public/tournament-banners/**",
           },
+          {
+            protocol: "https",
+            hostname: supabaseStorageHost,
+            pathname: "/storage/v1/object/sign/slips/**",
+          },
         ]
       : [],
   },

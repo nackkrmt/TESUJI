@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useActionState, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   AlertCircle,
   CheckCircle2,
@@ -16,6 +17,7 @@ import {
   FieldLabel,
   inputClassName,
   primaryButtonClassName,
+  secondaryButtonClassName,
   selectClassName,
 } from "@/components/mobile/mobile-shell";
 import type {
@@ -399,6 +401,12 @@ function RegistrationResultPanel({
         <SummaryLine label="ยอดชำระ" value={formatMoney(result.amountDue)} />
         {result.paymentOrderId ? <SummaryLine label="Payment order" value={shortId(result.paymentOrderId)} /> : null}
       </div>
+
+      {result.paymentOrderId ? (
+        <Link href={`/payments/${result.paymentOrderId}`} className={`mt-4 ${secondaryButtonClassName}`}>
+          ไปหน้าชำระเงิน
+        </Link>
+      ) : null}
     </section>
   );
 }

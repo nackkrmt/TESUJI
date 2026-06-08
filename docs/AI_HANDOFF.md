@@ -1,6 +1,6 @@
 # TESUJI AI Handoff
 
-Last updated: 2026-06-08
+Last updated: 2026-06-09
 
 This is the short, current-state handoff for agents switching between Codex and Claude.
 
@@ -56,6 +56,10 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606080001_registration_transaction_rpc.sql`
   - `202606080002_registration_promo_transaction.sql`
   - `202606080003_registration_promo_transaction_jsonb_plan.sql`
+  - `202606080004_payment_slip_submission.sql`
+  - `202606080005_registration_cancellation.sql`
+  - `202606080006_admin_payment_verification.sql`
+  - `202606090001_waiting_list_promotion_timeout.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
@@ -158,6 +162,11 @@ Test emails were `codex-e2e-...@example.com`.
   - Edits tournament details and divisions together in `TournamentForm`; status and promo codes remain separate action forms.
   - Server actions return typed `{ status, message, id? }` results for form UX.
   - Future Admin protection seam lives in `ensureAdminMutationAllowedForDevMode()` and must later check `account_roles.admin = active`.
+- `/admin/payments`
+  - Server page listing real `pending_verify` payment orders from Supabase.
+  - Shows payer account, tournament, amount, linked registrations, signed private slip preview/link, and review controls.
+  - Actions call service-role RPCs through the same dev-mode Admin seam: approve confirms the payment order and linked registrations; reject-send-new returns both to `pending_payment`; reject-cancel cancels both and runs waiting-list promotion in the same transaction.
+  - Includes a real Run timeout sweep action that calls `expire_pending_payment_orders` to expire overdue `pending_payment` orders, expire linked registrations, and promote the next waiting-list row.
 - `/referee/invite`
   - Logged-in users can redeem a one-time Referee invite code.
 - `/tournaments`
@@ -165,6 +174,20 @@ Test emails were `codex-e2e-...@example.com`.
 - `/tournaments/[id]`
   - Mobile-frame public detail page with real tournament details and divisions.
   - Registration/payment CTA is intentionally disabled until Sprint 5.
+- `/payments/[id]`
+  - Mobile-frame payment detail page for real pending payment orders.
+  - Shows amount summary, PromptPay QR generated from the payment order/tournament PromptPay ID and exact `amount_due`, linked registrations, deadline text, and submitted slip link after upload.
+- `POST /payments/[id]/slip`
+  - Authenticated multipart slip upload route.
+  - Rejects non-JPG/PNG and files over 10MB before Supabase Storage upload.
+  - Uploads to private `slips` bucket, then calls `submit_payment_slip` RPC to move the payment order and linked registrations to `pending_verify`.
+- `/my-registrations`
+  - Mobile-frame list of real registrations for the logged-in Player account plus approved linked players when the user is an active Coach.
+  - Shows status, tournament/division/player, payment summary, waiting-list position, and history.
+- `/my-registrations/[id]`
+  - Mobile-frame registration detail route with real payment status, slip link, payment countdown, cancellation audit, and a cancel form when the registration is eligible.
+  - User cancellation requires a reason. It calls `cancel_registration` and writes `cancelled_by`, `cancelled_at`, and `cancellation_reason`.
+  - Cancellation is forbidden on/after event date and while payment is `pending_verify`. Slot-opening cancellations call waiting-list promotion in the same DB transaction.
 - `/profile`
   - Logged-in users see Player Profile, roles, incoming Coach Link requests, and Coach tools.
   - Active Coach users can search existing Player accounts and request a link.
@@ -192,6 +215,10 @@ Test emails were `codex-e2e-...@example.com`.
 - Sprint 5 S5.1 migration `202606080001_registration_transaction_rpc.sql` creates service-role-only RPC `create_registration_transaction(p_actor_account_id, p_player_profile_id, p_division_ids, p_payment_expires_at)`. It validates actor permission, open tournament window, active divisions, duplicate registration, power/age bounds, time-slot conflicts, quota/waiting-list placement, zero-fee confirmation, and one paid `payment_order` for payable registrations.
 - Sprint 5 S5.2 migrations `202606080002_registration_promo_transaction.sql` and `202606080003_registration_promo_transaction_jsonb_plan.sql` extend the RPC to `create_registration_transaction(p_actor_account_id, p_player_profile_id, p_division_ids, p_payment_expires_at, p_promo_code)`. The final active implementation is `202606080003` (JSONB plan, no temp table) and validates promo active/window/usage/division rules, calculates free/percentage/fixed discounts, writes `promo_code_usages`, increments `promo_codes.used_count` atomically, and confirms zero-amount registrations without payment orders.
 - Sprint 5 S5.3 adds the public mobile registration UI at `/tournaments/[id]/register`. Tournament detail CTA is enabled only when `getIsRegistrationOpen()` passes status/window/active-division checks. The page reads real account/profile/coach-linked-player/division-summary data through `src/lib/registrations/options.ts`, submits through a server action, and ultimately uses `create_registration_transaction`; there is no mock success path.
+- Sprint 5 S5.4 adds `submit_payment_slip(p_actor_account_id, p_payment_order_id, p_slip_url, p_slip_storage_path, p_paid_at)` as a service-role-only RPC. It locks the payment order, validates actor access, requires `pending_payment`, rejects expired/zero-amount orders, updates `payment_orders` to `pending_verify`, and updates linked `pending_payment` registrations to `pending_verify` in the same DB transaction.
+- Sprint 5 S5.5 adds `cancel_registration(p_actor_account_id, p_registration_id, p_cancellation_reason)` as a service-role-only RPC. It locks the registration, validates owner/registered-by/approved-Coach/Admin access, rejects inactive registrations, rejects `pending_verify`, rejects on/after event date in Bangkok, writes cancellation audit fields, and cancels a single-registration `pending_payment` payment order when no active linked registrations remain. Multi-registration pending-payment orders have their fee/discount totals reduced for the cancelled registration. S5.7 replaces this RPC so slot-opening cancellations run waiting-list promotion in the same transaction.
+- Sprint 5 S5.6 adds service-role-only RPCs `approve_payment_order(p_payment_order_id, p_admin_account_id)`, `reject_payment_order_send_new(p_payment_order_id, p_rejection_reason, p_admin_account_id)`, and `reject_payment_order_cancel(p_payment_order_id, p_rejection_reason, p_admin_account_id)`. All lock the payment order, require `pending_verify`, update linked registrations in the same transaction, and optionally validate a future active Admin actor when `p_admin_account_id` is provided. Dev-mode Admin actions currently pass `null` through `ensureAdminMutationAllowedForDevMode()`.
+- Sprint 5 S5.7 adds `expired_at` audit columns to `payment_orders` and `registrations`, `compact_waiting_list_positions(p_division_id)`, `promote_waiting_list_for_division(p_division_id, p_payment_expires_at)`, and `expire_pending_payment_orders(p_limit, p_payment_expires_at)`. Promotion is FIFO by `waiting_list_position`, then `created_at`, then `id`; paid promotions create a new `pending_payment` order with 24h default expiry, while free promotions become `confirmed` without an order. Replaced `cancel_registration` and `reject_payment_order_cancel` call promotion exactly once per opened division.
 
 ## Dev Tooling
 
@@ -259,6 +286,7 @@ Useful URL checks:
 - `http://127.0.0.1:3000/register`
 - `http://127.0.0.1:3000/admin/database`
 - `http://127.0.0.1:3000/admin/tournaments`
+- `http://127.0.0.1:3000/admin/payments`
 - `http://127.0.0.1:3000/tournaments`
 
 ## Role Management Verification
@@ -345,10 +373,71 @@ Verified on 2026-06-08 (Asia/Bangkok):
 - `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/tournaments/[id]/register`.
 - Browser smoke used local Next dev server at `http://127.0.0.1:3100` and headless Chrome CDP at mobile viewport 390x900. It created temporary `Codex S5.3 UI Smoke%` tournament/user data, logged in through `/api/auth/login`, opened `/tournaments/[id]/register`, verified the form rendered two real divisions including a full `waiting list` division, selected both, and clicked submit in the browser. Live DB then contained one `pending_payment` registration with a `payment_order_id` and one `waiting_list` registration at position 1. Smoke data was deleted; follow-up query found 0 remaining `Codex S5.3 UI Smoke%` tournaments/users.
 
+## Sprint 5 Payment QR And Slip Upload Verification
+
+Verified on 2026-06-08 (Asia/Bangkok):
+
+- Added `src/lib/payments/promptpay.ts` to generate EMV Merchant-Presented PromptPay payloads locally with PromptPay AID `A000000677010111`, exact tag `54` amount, and CRC16-CCITT-FALSE; existing `qrcode` dependency renders the QR data URL.
+- Added `src/lib/registrations/payment.ts`, `/payments/[id]`, and `POST /payments/[id]/slip`.
+- Updated S5.3 registration success UI to link paid transactions to `/payments/[paymentOrderId]`.
+- `npx.cmd supabase db push --linked --yes` applied `202606080004_payment_slip_submission.sql`.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/payments/[id]` and `/payments/[id]/slip`.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100` and headless Chrome CDP at mobile viewport 390x900. It created temporary `Codex S5.4 Smoke%` tournament/user/payment data, logged in through `/api/auth/login`, opened `/payments/[id]`, verified the QR/form/amount/linked registration rendered, uploaded a PNG slip, confirmed live DB changed `payment_orders.status` and linked `registrations.status` to `pending_verify`, then reloaded the page and verified the QR/form were gone and a signed slip link was shown.
+- Negative browser smoke confirmed `text/plain` and `image/png` larger than 10MB are rejected with HTTP 400 before Storage upload.
+- Smoke tournament/user/storage object/temp slip file were deleted; follow-up query found 0 remaining `Codex S5.4 Smoke%` tournaments.
+
+## Sprint 5 My Registrations And Cancel Verification
+
+Verified on 2026-06-08 (Asia/Bangkok):
+
+- Added `src/lib/registrations/my-registrations.ts`, `/my-registrations`, `/my-registrations/[id]`, and a server-action cancel form.
+- Added Home Quick Access entry for `/my-registrations`.
+- `npx.cmd supabase db push --linked --yes` applied `202606080005_registration_cancellation.sql`.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/my-registrations` and `/my-registrations/[id]`.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100` and headless Chrome CDP at mobile viewport 390x900. It created temporary `Codex S5.5 Smoke%` owner/stranger users, a future pending-payment registration with payment order, and a past confirmed registration. Logged in as owner, `/my-registrations` rendered both registrations, `/my-registrations/[id]` rendered payment details and cancel form, and submitting the cancel form moved the future registration to `cancelled` with reason `UI smoke cancel`.
+- Live DB check confirmed the cancelled registration had `cancelled_by`, `cancelled_at`, and `cancellation_reason`; its single-registration payment order changed to `cancelled`; the past registration stayed `confirmed`.
+- Negative RPC smoke confirmed a non-owner/non-linked account cannot cancel another user's registration and a registration on/after event date cannot be cancelled.
+- Smoke tournaments/users were deleted; follow-up query found 0 remaining `Codex S5.5 Smoke%` tournaments.
+
+## Sprint 5 Admin Payment Verify
+
+Verified on 2026-06-08 (Asia/Bangkok):
+
+- Added `202606080006_admin_payment_verification.sql` with service-role-only payment review RPCs and a pending-verify index.
+- Added `src/lib/admin/payments.ts`, `/admin/payments`, review server actions, and client controls for approve, reject-send-new, and reject-cancel.
+- Added the Admin sidebar Payments nav item and allowed signed private `slips` URLs in `next.config.ts` for unoptimized slip preview images.
+- `npx.cmd supabase db push --linked --yes` applied `202606080006_admin_payment_verification.sql`.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin/payments`.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100` at desktop width. It created temporary `Codex S5.6 Smoke%` tournament/user/payment data with three private slip uploads, opened `/admin/payments`, verified the queue, actions, nav, and slip preview rendered, approved one order through the UI, and confirmed it disappeared from the pending queue.
+- Live DB smoke called the two reject RPCs for the remaining orders: reject-send-new moved the order and linked registration back to `pending_payment` and cleared slip fields; reject-cancel moved both to `cancelled` with rejection/cancellation audit and `waitingListPromotionDeferred = true`.
+- Smoke tournament/user/storage objects were deleted; follow-up queries found 0 remaining `Codex S5.6 Smoke%` tournaments/accounts/storage objects.
+
+## Sprint 5 Waiting List Promotion And Timeout
+
+Verified on 2026-06-09 (Asia/Bangkok):
+
+- Added `202606090001_waiting_list_promotion_timeout.sql` with `expired_at` audit columns, FIFO waiting-list compaction/promotion RPCs, pending-payment timeout lifecycle RPC, and S5.7 replacements for `cancel_registration` and `reject_payment_order_cancel`.
+- Updated `src/lib/admin/payments.ts` to parse promotion/timeout RPC results and added a real Run timeout sweep action on `/admin/payments`.
+- Updated `/my-registrations/[id]` cancellation feedback/copy so it no longer describes waiting-list promotion as deferred.
+- `npx.cmd supabase db push --linked --yes` applied `202606090001_waiting_list_promotion_timeout.sql`.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin/payments`, `/my-registrations`, and `/my-registrations/[id]`.
+- Live DB smoke created temporary `Codex S5.7 Smoke%` users/tournament/divisions and verified:
+  - Full paid division creates `waiting_list` position 1 through `create_registration_transaction`.
+  - User cancellation promotes the oldest paid waiting-list registration once and creates a new pending payment order.
+  - Timeout sweep with limit 1 expires the old pending payment order/registration and promotes the oldest paid waiting-list registration once.
+  - Full free division creates `waiting_list`; cancellation promotes the oldest free waiting-list row to `confirmed` without creating a payment order.
+  - Repeated direct promotion calls return `promoted = false` after the slot is already filled, so no double promotion occurs.
+- Smoke data was deleted; follow-up query found 0 remaining `Codex S5.7 Smoke%` tournaments/accounts.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100`, opened `/admin/payments`, and verified the page heading plus Run timeout sweep button render with no console errors or migration warning.
+
 ## Recommended Next Task
 
-1. Continue to Sprint 5 slice S5.4 Payment QR And Slip Upload.
+1. Continue to Sprint 5 slice S5.8 End-To-End Smoke And Handoff.
    - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, and `docs/plans/05_registration_payment_token_light_slices.md`.
-   - Extra read: payment tables/bucket migration, `package.json`, `src/lib/supabase/admin.ts`, existing upload route patterns under `src/app/admin/database`, and the S5.3 registration route/action files.
-   - Next command can be: `Run Sprint 5 slice S5.4 from docs/plans/05_registration_payment_token_light_slices.md. Implement payment QR and slip upload for real payment orders.`
+   - Extra read: only touched Sprint 5 files from `docs/AI_HANDOFF.md` plus `docs/plans/05_registration_payment_token_light_slices.md` S5.8.
+   - Next command can be: `Run Sprint 5 slice S5.8 from docs/plans/05_registration_payment_token_light_slices.md. Do final smoke verification and update handoff.`
 2. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.

@@ -1,4 +1,4 @@
-import { Database, Gauge, ShieldCheck, Trophy, type LucideIcon } from "lucide-react";
+import { CreditCard, Database, Gauge, ShieldCheck, Trophy, type LucideIcon } from "lucide-react";
 
 export type AdminNavItem = {
   href: string;
@@ -25,6 +25,12 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Tournaments",
     description: "Tournament / divisions / promo codes",
     icon: Trophy,
+  },
+  {
+    href: "/admin/payments",
+    label: "Payments",
+    description: "PromptPay slip verification",
+    icon: CreditCard,
   },
   {
     href: "/admin/roles",

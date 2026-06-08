@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LogOut, ShieldCheck, Trophy, UserRound } from "lucide-react";
+import { ListChecks, LogOut, ShieldCheck, Trophy, UserRound } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { DigitalIdCard } from "@/components/home/digital-id-card";
 import { MobileShell } from "@/components/mobile/mobile-shell";
@@ -57,6 +57,12 @@ export default async function Home() {
       icon: <Trophy className="h-5 w-5" aria-hidden />,
       label: "ดูรายการ",
     },
+    {
+      description: "ดูสถานะสมัคร ชำระเงิน waiting list และยกเลิกรายการที่ยังเข้าเงื่อนไข",
+      href: "/my-registrations",
+      icon: <ListChecks className="h-5 w-5" aria-hidden />,
+      label: "รายการสมัคร",
+    },
     isActiveAdmin
       ? {
           description: "เปิดหน้าจัดการหลังบ้าน",
@@ -103,7 +109,7 @@ export default async function Home() {
               <p className="mt-1 text-sm text-[#8390bd]">ทางลัดที่เชื่อมกับ route จริงแล้ว</p>
             </div>
             <span className="rounded-full border border-[#27345b] px-2.5 py-1 text-xs font-semibold text-[#aab4da]">
-              2x2
+              {quickActions.length.toLocaleString("th-TH")}
             </span>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
