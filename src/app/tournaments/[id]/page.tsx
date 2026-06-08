@@ -3,7 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays, MapPin, Ticket } from "lucide-react";
-import { MobileShell } from "@/components/mobile/mobile-shell";
+import { MobileShell, primaryButtonClassName } from "@/components/mobile/mobile-shell";
+import { getIsRegistrationOpen } from "@/lib/registrations/options";
 import { getPublicTournamentDetail, type DivisionRecord } from "@/lib/tournaments/admin";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export default async function TournamentDetailPage({
     notFound();
   }
 
-  const canRegister = tournament.status === "open";
+  const canRegister = getIsRegistrationOpen(tournament);
 
   return (
     <MobileShell title={tournament.title} subtitle="รายละเอียดรายการแข่งขัน">
@@ -102,16 +103,19 @@ export default async function TournamentDetailPage({
 
         <section className="rounded-2xl border border-[#27345b] bg-[#101832] p-4">
           <h2 className="font-semibold text-white">การสมัคร</h2>
-          <p className="mt-2 text-sm leading-6 text-[#8390bd]">
-            Registration/payment flow อยู่ใน Sprint 5 ตอนนี้ปุ่มจึงแสดงสถานะตาม tournament จริงแต่ยังไม่เปิดฟอร์มสมัคร
-          </p>
-          <button
-            type="button"
-            disabled
-            className="mt-4 inline-flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-md bg-[#27345b] px-4 py-3 text-sm font-semibold text-[#aab4da] opacity-80"
-          >
-            {canRegister ? "ระบบสมัครจะเปิดใน Sprint 5" : "ยังไม่เปิดรับสมัคร"}
-          </button>
+          {canRegister ? (
+            <Link href={`/tournaments/${tournament.id}/register`} className={`mt-4 ${primaryButtonClassName}`}>
+              สมัครแข่งขัน
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="mt-4 inline-flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-md bg-[#27345b] px-4 py-3 text-sm font-semibold text-[#aab4da] opacity-80"
+            >
+              ยังไม่เปิดรับสมัคร
+            </button>
+          )}
         </section>
       </div>
     </MobileShell>

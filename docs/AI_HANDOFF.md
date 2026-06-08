@@ -35,6 +35,9 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `tournaments`
   - `divisions`
   - `promo_codes`
+  - `payment_orders`
+  - `registrations`
+  - `promo_code_usages`
 - Current migrations:
   - `202606010001_go_player_database.sql`
   - `202606010002_replace_go_player_database_source.sql`
@@ -50,6 +53,9 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606060001_database_import_runs.sql`
   - `202606060002_fix_school_replace_delete_where.sql`
   - `202606070001_registration_payment_foundation.sql`
+  - `202606080001_registration_transaction_rpc.sql`
+  - `202606080002_registration_promo_transaction.sql`
+  - `202606080003_registration_promo_transaction_jsonb_plan.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
@@ -183,6 +189,9 @@ Test emails were `codex-e2e-...@example.com`.
 - Tournament public read RLS exposes non-draft tournaments/divisions; promo code reads are future-gated to active Admin accounts and currently managed through service-role admin actions.
 - Tournament banners use Supabase Storage bucket `tournament-banners`, configured public with JPG/PNG/WebP and a 2MB file limit in migration `202606040002_refactor_tournament_creation.sql`.
 - Sprint 5 S5.0 migration `202606070001_registration_payment_foundation.sql` creates `payment_orders`, `registrations`, `promo_code_usages`, and a private `slips` Storage bucket. It keeps registration/payment rows readable only to the owner, approved related Coach, or future Admin gate, and exposes public tournament registration availability only through aggregate view `division_registration_summary`.
+- Sprint 5 S5.1 migration `202606080001_registration_transaction_rpc.sql` creates service-role-only RPC `create_registration_transaction(p_actor_account_id, p_player_profile_id, p_division_ids, p_payment_expires_at)`. It validates actor permission, open tournament window, active divisions, duplicate registration, power/age bounds, time-slot conflicts, quota/waiting-list placement, zero-fee confirmation, and one paid `payment_order` for payable registrations.
+- Sprint 5 S5.2 migrations `202606080002_registration_promo_transaction.sql` and `202606080003_registration_promo_transaction_jsonb_plan.sql` extend the RPC to `create_registration_transaction(p_actor_account_id, p_player_profile_id, p_division_ids, p_payment_expires_at, p_promo_code)`. The final active implementation is `202606080003` (JSONB plan, no temp table) and validates promo active/window/usage/division rules, calculates free/percentage/fixed discounts, writes `promo_code_usages`, increments `promo_codes.used_count` atomically, and confirms zero-amount registrations without payment orders.
+- Sprint 5 S5.3 adds the public mobile registration UI at `/tournaments/[id]/register`. Tournament detail CTA is enabled only when `getIsRegistrationOpen()` passes status/window/active-division checks. The page reads real account/profile/coach-linked-player/division-summary data through `src/lib/registrations/options.ts`, submits through a server action, and ultimately uses `create_registration_transaction`; there is no mock success path.
 
 ## Dev Tooling
 
@@ -206,7 +215,7 @@ Verified on 2026-06-07 (Asia/Bangkok):
 - Digital ID QR `issuedAt` is rounded to the hour.
 - Verified profile sync updates in batches of 10.
 - Home Quick Access includes `/tournaments`.
-- `npm.cmd run lint` and `npx.cmd tsc --noEmit` passed.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed.
 
 ## Antigravity Accidental Revert Repair
 
@@ -306,10 +315,40 @@ Verified on 2026-06-08 (Asia/Bangkok):
 - RLS smoke test created a temporary open tournament/division plus registration/payment/promo usage, confirmed anon could not see rows from private tables, confirmed anon could see public aggregate `division_registration_summary`, then deleted the smoke data. Follow-up query found 0 remaining `Codex S5 RLS Smoke%` tournaments.
 - No TypeScript/source files changed, so `npm.cmd run lint` was not run for S5.0.
 
+## Sprint 5 Registration Transaction Verification
+
+Verified on 2026-06-08 (Asia/Bangkok):
+
+- Added `src/lib/registrations/transaction.ts` as the server-side wrapper for `create_registration_transaction`; no public UI was added in S5.1.
+- `npx.cmd supabase db push --linked --yes` applied `202606080001_registration_transaction_rpc.sql` to the linked Supabase project.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- Live DB smoke test created temporary auth users/accounts/profiles, an active tournament, divisions, and an approved Coach Link. It verified: Player self registration creates one pending payment order plus a zero-fee confirmed registration; duplicate registration is rejected; a full division creates `waiting_list` position 1 without a payment order; active Coach can register an approved linked Player and create a payment order. Smoke data was deleted; follow-up query found 0 remaining `Codex S5.1 Smoke%` tournaments.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed.
+
+## Sprint 5 Promo Code Transaction Verification
+
+Verified on 2026-06-08 (Asia/Bangkok):
+
+- Updated `src/lib/registrations/transaction.ts` to accept optional `promoCode` and return promo fields (`promoCodeId`, `promoCode`, `promoCodeUsageIds`) plus discounted registration/payment totals.
+- `npx.cmd supabase db push --linked --yes` applied `202606080002_registration_promo_transaction.sql` and then `202606080003_registration_promo_transaction_jsonb_plan.sql`. Migration `202606080002` compiled but Supabase lint could not statically resolve its temp table; `202606080003` replaced the RPC with a JSONB planning implementation and is the active function body.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed after `202606080003`.
+- Live DB smoke test created temporary auth users/accounts/profiles, an active tournament, divisions, and promo codes. It verified: `free` promo confirms immediately with no payment order; `percentage` and `fixed` promos create pending payment orders with discounted `amountDue`; invalid, expired, overused, and wrong-division codes fail without creating registrations or promo usages; `used_count` increments only for successful uses. Smoke data was deleted; follow-up query found 0 remaining `Codex S5.2 Smoke%` tournaments.
+- `npm.cmd run lint` and `npx.cmd tsc --noEmit` passed.
+
+## Sprint 5 Public Registration UI Verification
+
+Verified on 2026-06-08 (Asia/Bangkok):
+
+- Added `src/lib/registrations/options.ts` to build the real registration page DTO from Supabase: current account, own player profile, approved Coach-linked players, active registrations, and `division_registration_summary` quota data.
+- Added `/tournaments/[id]/register` with mobile-frame UI, eligible division cards, waiting-list display, promo input, payment summary, result panel, and server action `submitTournamentRegistration`.
+- Updated `/tournaments/[id]` so the registration CTA links to the real register route only when tournament status/window/active-division checks pass.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/tournaments/[id]/register`.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100` and headless Chrome CDP at mobile viewport 390x900. It created temporary `Codex S5.3 UI Smoke%` tournament/user data, logged in through `/api/auth/login`, opened `/tournaments/[id]/register`, verified the form rendered two real divisions including a full `waiting list` division, selected both, and clicked submit in the browser. Live DB then contained one `pending_payment` registration with a `payment_order_id` and one `waiting_list` registration at position 1. Smoke data was deleted; follow-up query found 0 remaining `Codex S5.3 UI Smoke%` tournaments/users.
+
 ## Recommended Next Task
 
-1. Continue to Sprint 5 slice S5.1 Registration Transaction.
+1. Continue to Sprint 5 slice S5.4 Payment QR And Slip Upload.
    - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, and `docs/plans/05_registration_payment_token_light_slices.md`.
-   - Extra read: local migration `supabase/migrations/202606070001_registration_payment_foundation.sql` plus the S5.1 files named in the slice plan.
-   - Next command can be: `Run Sprint 5 slice S5.1 from docs/plans/05_registration_payment_token_light_slices.md. Implement real registration transaction only; no UI yet.`
+   - Extra read: payment tables/bucket migration, `package.json`, `src/lib/supabase/admin.ts`, existing upload route patterns under `src/app/admin/database`, and the S5.3 registration route/action files.
+   - Next command can be: `Run Sprint 5 slice S5.4 from docs/plans/05_registration_payment_token_light_slices.md. Implement payment QR and slip upload for real payment orders.`
 2. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.
