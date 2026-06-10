@@ -278,6 +278,20 @@ export async function getPendingPaymentOrders(): Promise<AdminPaymentOrder[]> {
   );
 }
 
+export async function getPendingPaymentOrderCount(): Promise<number> {
+  const supabase = createSupabaseAdminClient();
+  const { count, error } = await supabase
+    .from("payment_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending_verify");
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
 export async function reviewPaymentOrder(input: {
   action: AdminPaymentReviewAction;
   paymentOrderId: string;

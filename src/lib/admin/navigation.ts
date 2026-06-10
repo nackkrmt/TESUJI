@@ -1,4 +1,4 @@
-import { CreditCard, Database, Gauge, ShieldCheck, Trophy, type LucideIcon } from "lucide-react";
+import { BadgeCheck, CreditCard, Database, Gauge, ShieldCheck, Trophy, type LucideIcon } from "lucide-react";
 
 export type AdminNavItem = {
   href: string;
@@ -31,6 +31,12 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Payments",
     description: "PromptPay slip verification",
     icon: CreditCard,
+  },
+  {
+    href: "/admin/ranks",
+    label: "Ranks",
+    description: "Pending rank approval",
+    icon: BadgeCheck,
   },
   {
     href: "/admin/roles",

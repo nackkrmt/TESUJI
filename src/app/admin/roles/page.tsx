@@ -1,7 +1,12 @@
 import { Check, Clock, ShieldCheck, UserCheck, X } from "lucide-react";
 import { RefereeInviteCreator } from "@/components/admin/referee-invite-creator";
-import { getCoachRequests, getRefereeInvites } from "@/lib/admin/role-management";
+import {
+  getCoachRequests,
+  getRefereeInvites,
+  type RefereeInviteRow,
+} from "@/lib/admin/role-management";
 import { reviewCoachRequest } from "./actions";
+import { RefereeInviteRevokeForm } from "./referee-invite-revoke-form";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +42,8 @@ export default async function AdminRolesPage() {
         <div className="grid grid-cols-2 gap-3 sm:w-fit">
           <Metric label="Coach pending" value={pendingCoachRequests.length.toLocaleString("th-TH")} />
           <Metric
-            label="Unused invites"
-            value={refereeInvites.filter((invite) => invite.status === "unused").length.toLocaleString("th-TH")}
+            label="Active invites"
+            value={refereeInvites.filter((invite) => invite.displayStatus === "active").length.toLocaleString("th-TH")}
           />
         </div>
       </header>
@@ -130,7 +135,7 @@ export default async function AdminRolesPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-white">Recent invites</h2>
-                  <p className="mt-1 text-sm text-[#8390bd]">Raw codes are not stored.</p>
+                  <p className="mt-1 text-sm text-[#8390bd]">Active, redeemed, expired, and revoked status.</p>
                 </div>
               </div>
             </div>
@@ -140,14 +145,22 @@ export default async function AdminRolesPage() {
             ) : (
               <div className="divide-y divide-[#202a49]">
                 {refereeInvites.map((invite) => (
-                  <div key={invite.id} className="grid gap-2 p-5">
+                  <div key={invite.id} data-invite-id={invite.id} className="grid gap-2 p-5">
                     <div className="flex items-center justify-between gap-3">
-                      <StatusBadge status={invite.status} />
+                      <StatusBadge status={invite.displayStatus} />
                       <p className="text-xs text-[#7480aa]">{formatDateTime(invite.createdAt)}</p>
                     </div>
-                    <p className="text-sm text-[#dce3ff]">Expires {formatDateTime(invite.expiresAt)}</p>
+                    <p className="text-sm text-[#dce3ff]">{getInviteTimingLabel(invite)}</p>
                     {invite.redeemedAccount ? (
                       <p className="text-xs text-[#8390bd]">Redeemed by {invite.redeemedAccount.email}</p>
+                    ) : null}
+                    {invite.revokedAccount ? (
+                      <p className="text-xs text-[#8390bd]">Revoked by {invite.revokedAccount.email}</p>
+                    ) : null}
+                    {invite.displayStatus === "active" ? (
+                      <div className="pt-1">
+                        <RefereeInviteRevokeForm inviteId={invite.id} />
+                      </div>
                     ) : null}
                   </div>
                 ))}
@@ -179,18 +192,34 @@ function EmptyState({ text }: { text: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const tone =
-    status === "pending" || status === "unused"
+    status === "pending" || status === "active"
       ? "bg-[#443013] text-[#ffc66d]"
-      : status === "approved" || status === "redeemed"
+    : status === "approved" || status === "redeemed"
         ? "bg-[#073d36] text-[#42e0b3]"
         : "bg-[#4a1724] text-[#ff8fa3]";
 
   return (
     <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>
-      {status === "pending" || status === "unused" ? <Clock className="h-3.5 w-3.5" aria-hidden /> : null}
+      {status === "pending" || status === "active" ? <Clock className="h-3.5 w-3.5" aria-hidden /> : null}
       {status}
     </span>
   );
+}
+
+function getInviteTimingLabel(invite: RefereeInviteRow) {
+  if (invite.displayStatus === "redeemed" && invite.redeemedAt) {
+    return `Redeemed ${formatDateTime(invite.redeemedAt)}`;
+  }
+
+  if (invite.displayStatus === "revoked" && invite.revokedAt) {
+    return `Revoked ${formatDateTime(invite.revokedAt)}`;
+  }
+
+  if (invite.displayStatus === "expired") {
+    return `Expired ${formatDateTime(invite.expiresAt)}`;
+  }
+
+  return `Expires ${formatDateTime(invite.expiresAt)}`;
 }
 
 function formatDateTime(value: string) {

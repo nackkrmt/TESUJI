@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { revokeRefereeInvite } from "@/lib/admin/role-management";
 import { generateRefereeInviteCode, hashRefereeInviteCode } from "@/lib/auth/referee-invites";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -9,6 +10,11 @@ export type InviteActionState = {
   status: "idle" | "success" | "error";
   message: string;
   code?: string;
+};
+
+export type RevokeInviteActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
 };
 
 const reviewSchema = z.object({
@@ -19,6 +25,10 @@ const reviewSchema = z.object({
 
 const inviteSchema = z.object({
   expiresInDays: z.coerce.number().int().min(1).max(30),
+});
+
+const revokeInviteSchema = z.object({
+  inviteId: z.string().uuid(),
 });
 
 export async function reviewCoachRequest(formData: FormData) {
@@ -80,10 +90,52 @@ export async function createRefereeInvite(
   }
 
   revalidatePath("/admin/roles");
+  revalidatePath("/admin");
 
   return {
     status: "success",
     message: `Invite created. Expires ${expiresAt.toLocaleDateString("th-TH")}.`,
     code,
   };
+}
+
+export async function revokeRefereeInviteAction(
+  _previousState: RevokeInviteActionState,
+  formData: FormData,
+): Promise<RevokeInviteActionState> {
+  const parsed = revokeInviteSchema.safeParse({
+    inviteId: formData.get("inviteId"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Invalid invite id.",
+    };
+  }
+
+  try {
+    const result = await revokeRefereeInvite(parsed.data);
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/roles");
+
+    return {
+      status: "success",
+      message: `Invite revoked${result.revokedAt ? ` at ${formatDateTime(result.revokedAt)}` : ""}.`,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "Invite revoke failed.",
+    };
+  }
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("th-TH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Bangkok",
+  }).format(new Date(value));
 }

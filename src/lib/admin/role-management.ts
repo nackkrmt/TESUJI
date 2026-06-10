@@ -1,4 +1,6 @@
+import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { ensureAdminMutationAllowedForDevMode } from "@/lib/tournaments/admin";
 
 export type CoachRequestRow = {
   id: string;
@@ -23,13 +25,35 @@ export type CoachRequestRow = {
 
 export type RefereeInviteRow = {
   id: string;
-  status: "unused" | "redeemed" | "expired" | "revoked";
+  status: RefereeInviteStatus;
+  displayStatus: RefereeInviteDisplayStatus;
   expiresAt: string;
   createdAt: string;
   redeemedAt: string | null;
+  revokedAt: string | null;
   redeemedAccount: {
     email: string;
   } | null;
+  revokedAccount: {
+    email: string;
+  } | null;
+};
+
+export type RefereeInviteStatus = "unused" | "redeemed" | "expired" | "revoked";
+
+export type RefereeInviteDisplayStatus = "active" | "redeemed" | "expired" | "revoked";
+
+export type RefereeInviteCounts = {
+  active: number;
+  redeemed: number;
+  expired: number;
+  revoked: number;
+};
+
+export type RevokeRefereeInviteResult = {
+  inviteId: string;
+  status: "revoked";
+  revokedAt: string | null;
 };
 
 type RoleRequestRecord = {
@@ -66,11 +90,20 @@ type ProfileRecord = {
 
 type InviteRecord = {
   id: string;
-  status: RefereeInviteRow["status"];
+  status: RefereeInviteStatus;
   expires_at: string;
   created_at: string;
   redeemed_at: string | null;
-  accounts:
+  revoked_at: string | null;
+  redeemed_account:
+    | {
+        email: string;
+      }
+    | Array<{
+        email: string;
+      }>
+    | null;
+  revoked_account:
     | {
         email: string;
       }
@@ -79,6 +112,21 @@ type InviteRecord = {
       }>
     | null;
 };
+
+type InviteCountRecord = {
+  status: RefereeInviteStatus;
+  expires_at: string;
+};
+
+const revokeInviteInputSchema = z.object({
+  inviteId: z.string().uuid(),
+});
+
+const revokeInviteResultSchema = z.object({
+  inviteId: z.string().uuid(),
+  status: z.literal("revoked"),
+  revokedAt: z.string().nullable(),
+});
 
 export async function getCoachRequests() {
   const supabase = createSupabaseAdminClient();
@@ -144,7 +192,9 @@ export async function getRefereeInvites() {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("referee_invite_codes")
-    .select("id,status,expires_at,created_at,redeemed_at,accounts:redeemed_by(email)")
+    .select(
+      "id,status,expires_at,created_at,redeemed_at,revoked_at,redeemed_account:redeemed_by(email),revoked_account:revoked_by(email)",
+    )
     .order("created_at", { ascending: false })
     .limit(20);
 
@@ -155,11 +205,74 @@ export async function getRefereeInvites() {
   return ((data ?? []) as unknown as InviteRecord[]).map<RefereeInviteRow>((invite) => ({
     id: invite.id,
     status: invite.status,
+    displayStatus: getRefereeInviteDisplayStatus(invite),
     expiresAt: invite.expires_at,
     createdAt: invite.created_at,
     redeemedAt: invite.redeemed_at,
-    redeemedAccount: firstRelation(invite.accounts),
+    revokedAt: invite.revoked_at,
+    redeemedAccount: firstRelation(invite.redeemed_account),
+    revokedAccount: firstRelation(invite.revoked_account),
   }));
+}
+
+export async function getRefereeInviteCounts(): Promise<RefereeInviteCounts> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("referee_invite_codes")
+    .select("status,expires_at");
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as InviteCountRecord[]).reduce<RefereeInviteCounts>(
+    (counts, invite) => {
+      counts[getRefereeInviteDisplayStatus(invite)] += 1;
+      return counts;
+    },
+    {
+      active: 0,
+      redeemed: 0,
+      expired: 0,
+      revoked: 0,
+    },
+  );
+}
+
+export async function revokeRefereeInvite(input: {
+  inviteId: string;
+}): Promise<RevokeRefereeInviteResult> {
+  ensureAdminMutationAllowedForDevMode();
+
+  const parsed = revokeInviteInputSchema.parse(input);
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("revoke_referee_invite", {
+    p_admin_account_id: getAdminActorAccountIdForDevMode(),
+    p_invite_id: parsed.inviteId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return revokeInviteResultSchema.parse(data);
+}
+
+function getAdminActorAccountIdForDevMode() {
+  // Dev mode intentionally leaves Admin routes unprotected. Future production auth should
+  // return the logged-in account id after checking account_roles.admin = active.
+  return null;
+}
+
+function getRefereeInviteDisplayStatus(invite: {
+  status: RefereeInviteStatus;
+  expires_at: string;
+}): RefereeInviteDisplayStatus {
+  if (invite.status === "unused") {
+    return new Date(invite.expires_at).getTime() <= Date.now() ? "expired" : "active";
+  }
+
+  return invite.status;
 }
 
 function firstRelation<T>(value: T | T[] | null): T | null {

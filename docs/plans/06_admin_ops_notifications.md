@@ -1,5 +1,7 @@
 # 06 Admin Operations And Notifications
 
+Token-light note: for day-to-day Sprint 6 work, use `docs/plans/06_admin_ops_notifications_token_light_slices.md` first. Read this full subsystem plan only when a slice needs more detail.
+
 ## Objective
 
 ทำเครื่องมือหลังบ้านที่ Admin ต้องใช้ทุกวันให้ครบ: ตรวจสลิป, approve rank, approve coach, referee invite, export รายชื่อ, notification manual

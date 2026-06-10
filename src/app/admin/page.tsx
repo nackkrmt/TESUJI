@@ -2,23 +2,41 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  Database,
+  BadgeCheck,
   ShieldCheck,
-  Trophy,
   UsersRound,
   WalletCards,
 } from "lucide-react";
-import { getCoachRequests } from "@/lib/admin/role-management";
+import { getPendingPaymentOrderCount } from "@/lib/admin/payments";
+import { getPendingRankApprovalCount } from "@/lib/admin/rank-approvals";
+import {
+  getCoachRequests,
+  getRefereeInviteCounts,
+  type RefereeInviteCounts,
+} from "@/lib/admin/role-management";
 import { getGoDatabaseSummaries } from "@/lib/go/database-summary";
 import { getAdminTournaments } from "@/lib/tournaments/admin";
 
 export const dynamic = "force-dynamic";
 
+type CountState = {
+  value: number;
+  error: string | null;
+};
+
+type RefereeInviteCountState = {
+  active: CountState;
+  redeemed: CountState;
+  expired: CountState;
+  revoked: CountState;
+};
+
 export default async function AdminDashboardPage() {
-  const [summaries, coachRequests, tournamentResult] = await Promise.all([
+  const [summaries, coachRequests, tournamentResult, queueCounts] = await Promise.all([
     getGoDatabaseSummaries(),
     getCoachRequests(),
     getTournamentDashboardState(),
+    getAdminQueueCounts(),
   ]);
   const tournaments = tournamentResult.tournaments;
   const totalImportable = summaries.reduce((sum, item) => sum + item.importableRows, 0);
@@ -34,37 +52,35 @@ export default async function AdminDashboardPage() {
         <div>
           <p className="text-sm font-semibold text-[#7378ff]">Admin Dashboard</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-normal text-white">
-            ภาพรวมระบบ TESUJI
+            TESUJI operations
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#8390bd]">
-            หน้านี้จะเป็นศูนย์รวม widget ของระบบทั้งหมด เมื่อแต่ละระบบพร้อมใช้งานจริงแล้วค่อยเปิดข้อมูลขึ้นมาแสดง
+            Live Admin queues for payment verification, rank review, Coach approval, and
+            Referee invite follow-up.
           </p>
         </div>
         <Link
-          href="/admin/tournaments"
-          className="inline-flex w-fit items-center justify-center gap-2 rounded-md bg-[#6c72ff] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#7c82ff]"
+          href="/admin/payments"
+          className="inline-flex w-fit items-center justify-center gap-2 rounded-md bg-[#6c72ff] px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-[#7c82ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8c91ff]/60"
         >
-          เปิด Tournament CRUD
+          Open ops queue
           <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>
       </header>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OverviewWidget
-          icon={<Database className="h-5 w-5" />}
-          label="Player Database"
-          value={`${readySources}/3`}
-          detail={`${totalImportable.toLocaleString("th-TH")} importable, ${totalSkipped.toLocaleString("th-TH")} skip`}
-          tone="cyan"
+          icon={<WalletCards className="h-5 w-5" />}
+          label="Payment Verify"
+          value={formatCount(queueCounts.pendingPayments)}
+          detail={queueCounts.pendingPayments.error ?? "pending_verify slip queue"}
+          tone="amber"
         />
         <OverviewWidget
-          icon={<Trophy className="h-5 w-5" />}
-          label="Tournaments"
-          value={tournamentResult.error ? "-" : tournaments.length.toLocaleString("th-TH")}
-          detail={
-            tournamentResult.error ??
-            `${openTournaments.toLocaleString("th-TH")} open, ${draftTournaments.toLocaleString("th-TH")} draft`
-          }
+          icon={<BadgeCheck className="h-5 w-5" />}
+          label="Rank Review"
+          value={formatCount(queueCounts.pendingRanks)}
+          detail={queueCounts.pendingRanks.error ?? "pending self-declared ranks"}
           tone="violet"
         />
         <OverviewWidget
@@ -75,11 +91,13 @@ export default async function AdminDashboardPage() {
           tone="green"
         />
         <OverviewWidget
-          icon={<WalletCards className="h-5 w-5" />}
-          label="Payments"
-          value="-"
-          detail="รอระบบตรวจสลิป"
-          tone="amber"
+          icon={<ShieldCheck className="h-5 w-5" />}
+          label="Referee Invites"
+          value={formatCount(queueCounts.refereeInvites.active)}
+          detail={`${formatCount(queueCounts.refereeInvites.redeemed)} redeemed, ${formatCount(
+            queueCounts.refereeInvites.revoked,
+          )} revoked`}
+          tone="cyan"
         />
       </section>
 
@@ -87,36 +105,52 @@ export default async function AdminDashboardPage() {
         <div className="min-h-[420px] rounded-lg border border-[#202a49] bg-[#101832] p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-white">Overview Widgets</h2>
-              <p className="mt-1 text-sm text-[#8390bd]">พื้นที่นี้จะเติม widget จริงทีละระบบ</p>
+              <h2 className="text-lg font-semibold text-white">Operation Queues</h2>
+              <p className="mt-1 text-sm text-[#8390bd]">
+                Real queues that need review or follow-up.
+              </p>
             </div>
             <span className="rounded-full bg-[#151f3e] px-3 py-1 text-xs font-semibold text-[#aab4da]">
-              empty
+              live
             </span>
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             <OverviewLink
-              href="/admin/tournaments"
-              title="Tournament"
-              description={
-                tournamentResult.error ??
-                "จัดการรายการแข่งขันจริง, divisions และ promo codes"
-              }
+              href="/admin/payments"
+              title="Payment verification"
+              description={`${formatCount(queueCounts.pendingPayments)} payment order(s) waiting for slip review`}
+            />
+            <OverviewLink
+              href="/admin/ranks"
+              title="Pending ranks"
+              description={`${formatCount(queueCounts.pendingRanks)} player profile(s) waiting for rank review`}
             />
             <OverviewLink
               href="/admin/roles"
-              title="Player roles"
+              title="Coach requests"
               description={`${pendingCoachRequests.toLocaleString("th-TH")} pending coach approval`}
             />
             <OverviewLink
               href="/admin/roles"
               title="Referee tools"
-              description="สร้าง invite code สำหรับ referee role"
+              description={`${formatCount(queueCounts.refereeInvites.active)} active invite(s), ${formatCount(
+                queueCounts.refereeInvites.expired,
+              )} expired`}
+            />
+            <OverviewLink
+              href="/admin/tournaments"
+              title="Tournaments"
+              description={
+                tournamentResult.error ??
+                `${openTournaments.toLocaleString("th-TH")} open, ${draftTournaments.toLocaleString("th-TH")} draft`
+              }
             />
             <OverviewLink
               href="/admin/database"
-              title="Exports"
-              description="ข้อมูล import/export จะต่อยอดหลัง registration/payment"
+              title="Player database"
+              description={`${readySources}/3 sources ready with ${totalImportable.toLocaleString(
+                "th-TH",
+              )} importable rows`}
             />
           </div>
         </div>
@@ -129,7 +163,7 @@ export default async function AdminDashboardPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-white">System Readiness</h2>
-                <p className="mt-1 text-sm text-[#8390bd]">ข้อมูลที่ใช้ได้จริงตอนนี้</p>
+                <p className="mt-1 text-sm text-[#8390bd]">Current real data sources.</p>
               </div>
             </div>
           </div>
@@ -149,11 +183,45 @@ export default async function AdminDashboardPage() {
                 </span>
               </div>
             ))}
+            <div className="flex items-center justify-between gap-4 p-5">
+              <div>
+                <p className="font-semibold text-white">Tournaments</p>
+                <p className="mt-1 text-xs text-[#8390bd]">
+                  {tournamentResult.error ?? `${tournaments.length.toLocaleString("th-TH")} total`}
+                </p>
+              </div>
+              <span className="rounded-full bg-[#20255d] px-2.5 py-1 text-xs font-semibold text-[#8c91ff]">
+                {tournamentResult.error ? "check" : "ready"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 p-5">
+              <div>
+                <p className="font-semibold text-white">Skipped import rows</p>
+                <p className="mt-1 text-xs text-[#8390bd]">DAN / KYU / AWARD parser audit</p>
+              </div>
+              <span className="rounded-full bg-[#0a3448] px-2.5 py-1 text-xs font-semibold text-[#58d8ff]">
+                {totalSkipped.toLocaleString("th-TH")}
+              </span>
+            </div>
           </div>
         </div>
       </section>
     </div>
   );
+}
+
+async function getAdminQueueCounts() {
+  const [pendingPayments, pendingRanks, refereeInvites] = await Promise.allSettled([
+    getPendingPaymentOrderCount(),
+    getPendingRankApprovalCount(),
+    getRefereeInviteCounts(),
+  ]);
+
+  return {
+    pendingPayments: countFromSettled(pendingPayments, "Payment queue unavailable"),
+    pendingRanks: countFromSettled(pendingRanks, "Rank queue unavailable"),
+    refereeInvites: refereeCountsFromSettled(refereeInvites),
+  };
 }
 
 async function getTournamentDashboardState() {
@@ -164,18 +232,69 @@ async function getTournamentDashboardState() {
     };
   } catch (error) {
     return {
-      error: getTournamentDashboardError(error),
+      error: getDashboardError(error, "Tournament summary unavailable"),
       tournaments: [],
     };
   }
 }
 
-function getTournamentDashboardError(error: unknown) {
-  if (isSupabaseErrorCode(error, "PGRST205")) {
-    return "Tournament migration pending";
+function countFromSettled(
+  result: PromiseSettledResult<number>,
+  fallbackMessage: string,
+): CountState {
+  if (result.status === "fulfilled") {
+    return {
+      error: null,
+      value: result.value,
+    };
   }
 
-  return "Tournament summary unavailable";
+  return {
+    error: getDashboardError(result.reason, fallbackMessage),
+    value: 0,
+  };
+}
+
+function refereeCountsFromSettled(
+  result: PromiseSettledResult<RefereeInviteCounts>,
+): RefereeInviteCountState {
+  if (result.status === "fulfilled") {
+    return {
+      active: { error: null, value: result.value.active },
+      redeemed: { error: null, value: result.value.redeemed },
+      expired: { error: null, value: result.value.expired },
+      revoked: { error: null, value: result.value.revoked },
+    };
+  }
+
+  const error = getDashboardError(result.reason, "Referee invite counts unavailable");
+
+  return {
+    active: { error, value: 0 },
+    redeemed: { error, value: 0 },
+    expired: { error, value: 0 },
+    revoked: { error, value: 0 },
+  };
+}
+
+function getDashboardError(error: unknown, fallbackMessage: string) {
+  if (isSupabaseErrorCode(error, "PGRST205") || isSupabaseErrorCode(error, "42703")) {
+    return "Migration pending";
+  }
+
+  if (isSupabaseErrorCode(error, "42883")) {
+    return "RPC migration pending";
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+}
+
+function formatCount(count: CountState) {
+  return count.error ? "-" : count.value.toLocaleString("th-TH");
 }
 
 function isSupabaseErrorCode(error: unknown, code: string) {
@@ -232,10 +351,10 @@ function OverviewLink({
   return (
     <Link
       href={href}
-      className="group min-h-32 rounded-md border border-dashed border-[#2c3961] bg-[#0c142d] p-4 transition hover:border-[#6c72ff] hover:bg-[#111a34]"
+      className="group min-h-32 rounded-md border border-dashed border-[#2c3961] bg-[#0c142d] p-4 transition duration-200 hover:border-[#6c72ff] hover:bg-[#111a34] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8c91ff]/60"
     >
       <p className="text-sm font-semibold text-[#dce3ff]">{title}</p>
-      <p className="mt-2 text-xs leading-5 text-[#7480aa] transition group-hover:text-[#aab4da]">
+      <p className="mt-2 text-xs leading-5 text-[#7480aa] transition duration-200 group-hover:text-[#aab4da]">
         {description}
       </p>
     </Link>

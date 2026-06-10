@@ -4,6 +4,8 @@
 
 ## Token-Light Usage
 
+- For Sprint 6, start from `06_admin_ops_notifications_token_light_slices.md` and work one slice per turn.
+
 - อ่าน `docs/AI_HANDOFF.md` และ `docs/DECISIONS.md` ก่อนเสมอ
 - อ่านเฉพาะไฟล์แผนย่อยที่เกี่ยวกับงานปัจจุบัน
 - ห้ามเปิด `master_plan.md` ทั้งไฟล์ ให้ใช้ `rg -n "<keyword>" master_plan.md` แล้วอ่านเฉพาะช่วงที่จำเป็น
@@ -26,6 +28,7 @@
 5. `04_tournament_admin.md` — Tournament, Division, Promo Code, admin CRUD
 6. `05_registration_payment_token_light_slices.md` — Sprint 5 token-light command slices
 7. `05_registration_payment_waiting_list.md` — สมัครแข่ง, payment, quota, waiting list full subsystem plan
-8. `06_admin_ops_notifications.md` — ตรวจสลิป, approve rank, user/admin ops, notification
-9. `07_tournament_day_realtime.md` — Phase 2: TSV, judge, results, realtime
-10. `08_quality_release.md` — test strategy, release readiness, no-mock audit
+8. `06_admin_ops_notifications_token_light_slices.md` - Sprint 6 token-light command slices
+9. `06_admin_ops_notifications.md` — ตรวจสลิป, approve rank, user/admin ops, notification
+10. `07_tournament_day_realtime.md` — Phase 2: TSV, judge, results, realtime
+11. `08_quality_release.md` — test strategy, release readiness, no-mock audit

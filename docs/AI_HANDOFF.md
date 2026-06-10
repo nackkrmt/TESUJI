@@ -1,6 +1,6 @@
 # TESUJI AI Handoff
 
-Last updated: 2026-06-09
+Last updated: 2026-06-11
 
 This is the short, current-state handoff for agents switching between Codex and Claude.
 
@@ -61,11 +61,13 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606080006_admin_payment_verification.sql`
   - `202606090001_waiting_list_promotion_timeout.sql`
   - `202606090002_repair_division_sort_order_drift.sql`
+  - `202606100001_pending_rank_approval.sql`
+  - `202606110001_referee_invite_revoke.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
 
-- Admin dashboard dark UI exists at `/admin`.
+- Admin dashboard dark UI exists at `/admin` and now shows live Admin operation queue counts for payment verification, pending ranks, Coach requests, and Referee invites.
 - Admin Database page exists at `/admin/database`.
 - Admin Database upload supports DAN/KYU/AWARD Excel files and imports parsed rows directly from the uploaded file bytes to Supabase.
 - Go DB upload now re-syncs already verified Player Profiles after each import. Verified profiles are rematched by normalized Thai first/last name against the current `go_player_database`, with DAN priority over KYU/AWARD and then highest `power_level`; matching rows update `rank`, `power_level`, `rating`, and `matched_go_player_id`.
@@ -83,6 +85,7 @@ This is the short, current-state handoff for agents switching between Codex and 
   - Approve/reject calls `review_coach_request`.
   - Creates one-time Referee invite codes stored only as salted hashes.
 - Referee invite redeem page exists at `/referee/invite` and calls `redeem_referee_invite`.
+- Referee invite revoke now exists through service-role-only RPC `revoke_referee_invite`; `/admin/roles` shows active/redeemed/expired/revoked invite status and only active invites expose a real Revoke action.
 - Migration `202606020001_role_management.sql` has been pushed to the real Supabase project.
 - Coach/Profile link flow exists at `/profile`:
   - `coach_player_links` stores Coach-to-Player relationships.
@@ -168,6 +171,11 @@ Test emails were `codex-e2e-...@example.com`.
   - Shows payer account, tournament, amount, linked registrations, signed private slip preview/link, and review controls.
   - Actions call service-role RPCs through the same dev-mode Admin seam: approve confirms the payment order and linked registrations; reject-send-new returns both to `pending_payment`; reject-cancel cancels both and runs waiting-list promotion in the same transaction.
   - Includes a real Run timeout sweep action that calls `expire_pending_payment_orders` to expire overdue `pending_payment` orders, expire linked registrations, and promote the next waiting-list row.
+- `/admin/ranks`
+  - Server page listing real `player_profiles.rank_status = pending` rows from Supabase.
+  - Shows player name, declared rank, power level, institute, created time, and account contact context.
+  - Client controls call the real S6.1 `approvePendingRank()` service through server actions for approve-as-is and edit-rank-then-approve.
+  - Uses the existing self-declared rank option set for edits and keeps route-level Admin protection deferred in dev mode.
 - `/referee/invite`
   - Logged-in users can redeem a one-time Referee invite code.
 - `/tournaments`
@@ -221,6 +229,15 @@ Test emails were `codex-e2e-...@example.com`.
 - Sprint 5 S5.6 adds service-role-only RPCs `approve_payment_order(p_payment_order_id, p_admin_account_id)`, `reject_payment_order_send_new(p_payment_order_id, p_rejection_reason, p_admin_account_id)`, and `reject_payment_order_cancel(p_payment_order_id, p_rejection_reason, p_admin_account_id)`. All lock the payment order, require `pending_verify`, update linked registrations in the same transaction, and optionally validate a future active Admin actor when `p_admin_account_id` is provided. Dev-mode Admin actions currently pass `null` through `ensureAdminMutationAllowedForDevMode()`.
 - Sprint 5 S5.7 adds `expired_at` audit columns to `payment_orders` and `registrations`, `compact_waiting_list_positions(p_division_id)`, `promote_waiting_list_for_division(p_division_id, p_payment_expires_at)`, and `expire_pending_payment_orders(p_limit, p_payment_expires_at)`. Promotion is FIFO by `waiting_list_position`, then `created_at`, then `id`; paid promotions create a new `pending_payment` order with 24h default expiry, while free promotions become `confirmed` without an order. Replaced `cancel_registration` and `reject_payment_order_cancel` call promotion exactly once per opened division.
 - Sprint 5 S5.8 added `202606090002_repair_division_sort_order_drift.sql` after final smoke initially hit a remote/PostgREST schema-cache drift on `divisions.sort_order`. The migration is idempotent (`add column if not exists`, `create index if not exists`) and was pushed to refresh/confirm the remote schema.
+- Sprint 6 S6.1 adds pending rank approval core:
+  - Migration `202606100001_pending_rank_approval.sql` adds rank review audit fields to `player_profiles`, helper `rank_to_power_level(text)`, and service-role-only RPC `approve_player_profile_rank(p_player_profile_id, p_final_rank, p_admin_account_id, p_admin_note)`.
+  - The RPC locks the profile, requires `rank_status = pending`, supports approve-as-is or edit-rank-then-approve, recalculates `power_level`, sets `rank_status = verified`, records audit fields, and validates `account_roles.admin = active` when `p_admin_account_id` is provided. Dev-mode service wrapper still passes `null`.
+  - App service wrapper lives at `src/lib/admin/rank-approvals.ts` with `getPendingRankApprovals()` and `approvePendingRank()`. No Admin UI was added in S6.1.
+- Sprint 6 S6.3 adds Admin ops consolidation:
+  - Migration `202606110001_referee_invite_revoke.sql` adds `referee_invite_codes.revoked_by` and service-role-only RPC `revoke_referee_invite(p_invite_id, p_admin_account_id)`.
+  - Referee invite raw codes are still generated only in the server action response, stored only as salted hashes, and not readable after page reload.
+  - `/admin` now reads lightweight counts for `payment_orders.status = pending_verify`, `player_profiles.rank_status = pending`, pending Coach requests, and Referee invite status buckets.
+  - `/admin/roles` shows active/redeemed/expired/revoked invite status. Expired display includes unused rows whose `expires_at` is in the past even before an attempted redemption marks them `expired`.
 
 ## Dev Tooling
 
@@ -229,6 +246,7 @@ Test emails were `codex-e2e-...@example.com`.
 - Auth UI a11y/UX pass (2026-06-01, guided by the ui-ux-pro-max review): shared input/button classes in `src/components/mobile/mobile-shell.tsx` now carry visible `focus-visible` rings + `cursor-pointer`; `globals.css` adds a global cursor-pointer base rule (Tailwind v4 drops the default button pointer) + a `prefers-reduced-motion` guard; root layout loads **Noto Sans Thai** for Thai glyphs (Geist is latin-only, so Thai text was falling back). `/login` is now a real `<form>` (Enter submits) with show/hide password, a loading spinner, and `role="alert"` errors; the register wizard got the same focus/cursor/loading/password-toggle + `role="alert"` treatment **without** changing its 4-step flow, fields, or components. `/forgot-password` and `/reset-password` now follow the same pattern too (real `<form>` + Enter-submit, `role`-tagged messages — `status` for the forgot-password success vs `alert` for errors — loading spinner, and show/hide toggles on both reset-password fields). Reuse the shared classes for any new auth inputs/buttons.
 - School DB upload/autocomplete pass (2026-06-01): migration `202606010006_school_database.sql` creates `school_database`, `replace_school_database(jsonb)`, and `search_school_database(text, integer)`. Admin upload route is `/admin/database/school/upload`; register uses `src/components/auth/institute-search-field.tsx`.
 - Upload-only DB pass (2026-06-06): migration `202606060001_database_import_runs.sql` creates `database_import_runs`. `/admin/database` reads Supabase row counts/samples and latest upload audit from Supabase; upload routes parse uploaded `.xlsx` bytes directly and no longer save, back up, or inspect files from a local database directory. Migration `202606060002_fix_school_replace_delete_where.sql` keeps `replace_school_database(jsonb)` compatible with Supabase safe-update rules by using an explicit `where true` delete.
+- Tournament Admin banner submit fix (2026-06-10): `next.config.ts` sets `experimental.serverActions.bodySizeLimit = "3mb"` so Admin tournament create/update forms can carry the documented 2MB banner upload plus multipart overhead without the browser-side Server Action request failing before app error handling runs.
 - Do NOT run `npm run build` while a `next dev` server is live on the same folder — both write `.next/` and the running dev server then serves mismatched SSR/client bundles → hydration errors (e.g. on `/register`). Stop dev first, or to recover: kill the dev server, delete `.next`, restart dev (no code change needed).
 
 ## Code Review Fix Verification
@@ -462,10 +480,56 @@ Verified on 2026-06-09 (Asia/Bangkok):
 - `npm.cmd run lint` passed.
 - `npm.cmd run build` passed. Build lists `/tournaments/[id]/register`, `/payments/[id]`, `/payments/[id]/slip`, `/my-registrations`, `/my-registrations/[id]`, and `/admin/payments`.
 
+## Sprint 6 Pending Rank Approval Core
+
+Verified on 2026-06-10 (Asia/Bangkok):
+
+- Added and pushed `202606100001_pending_rank_approval.sql`.
+- `npx.cmd supabase db push --linked --yes` applied the migration to the linked Supabase project.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- Live DB smoke created temporary `codex-s61-...@example.com` auth users/accounts/profiles and verified:
+  - approve-as-is changed a pending `15 Kyu` profile to `verified`, kept rank/power level, and wrote review audit fields.
+  - edit-rank approval changed `10 Kyu` to `1 Dan`, recalculated `power_level = 17`, and wrote original/final rank audit fields.
+  - invalid final rank was rejected and left the profile pending with no review timestamp.
+  - a non-pending profile cannot be approved again.
+- Smoke auth users were deleted; follow-up query found 0 remaining S6.1 smoke account rows.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed.
+
+## Sprint 6 Pending Rank Approval UI
+
+Verified on 2026-06-10 (Asia/Bangkok):
+
+- Added `/admin/ranks` with a real Supabase-backed pending rank queue using `getPendingRankApprovals()`.
+- Added `src/app/admin/ranks/actions.ts` and `rank-approval-controls.tsx` for approve-as-is and edit-rank-then-approve actions on top of the S6.1 service/RPC.
+- Added the Admin sidebar/mobile nav entry `Ranks`.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin/ranks`.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100` at desktop width. It created temporary `codex-s62...@example.com` auth users/accounts/profiles, opened `/admin/ranks`, verified the Ranks nav and queue rendered real pending profiles, approved one profile as-is, edited another from `10 Kyu` to `1 Dan`, and saw success feedback for both actions.
+- Live DB check confirmed the approved profiles moved to `rank_status = verified`, edit-rank recalculated `power_level = 17`, and review audit fields were written.
+- Browser console had no warnings/errors. Smoke auth users were deleted; follow-up query found 0 remaining S6.2 smoke account rows.
+
+## Sprint 6 Admin Ops Consolidation
+
+Verified on 2026-06-11 (Asia/Bangkok):
+
+- Added and pushed `202606110001_referee_invite_revoke.sql` to the linked Supabase project.
+- Added lightweight Admin dashboard queue counts for pending payment verification, pending ranks, Coach requests, and Referee invite status buckets.
+- Added `getPendingPaymentOrderCount()`, `getPendingRankApprovalCount()`, `getRefereeInviteCounts()`, and `revokeRefereeInvite()` service helpers.
+- Added `/admin/roles` Referee invite status visibility for active/redeemed/expired/revoked plus a real Revoke action for active invites only.
+- `npx.cmd supabase db push --linked --yes` applied the migration.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- Live DB smoke created temporary `codex-s63-...@example.com` auth users/accounts/profiles and verified:
+  - Referee invite creation stores only `code_hash`; revoke changes status to `revoked`; redeeming the revoked code fails and does not grant `account_roles.referee`.
+  - Existing `review_coach_request` still grants active Coach role on approve and does not grant Coach role on reject.
+  - Payment queue service still lists `pending_verify` orders; approve confirms order/registration; reject-send-new returns order/registration to `pending_payment`; reject-cancel cancels order/registration.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100`, opened `/admin`, `/admin/roles`, and `/admin/payments`, verified dashboard queue labels, created a Referee invite through the UI, confirmed the raw code disappeared after reload, revoked the invite through the UI, and saw no console errors.
+- Smoke auth users, tournament/payment rows, and the UI-created invite row were deleted; follow-up checks found 0 remaining smoke accounts/tournaments/invite rows.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin`, `/admin/payments`, `/admin/ranks`, and `/admin/roles`.
+
 ## Recommended Next Task
 
 1. Continue to Sprint 6 Admin Operations And Notifications.
-   - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, and `docs/plans/06_admin_ops_notifications.md`.
-   - Suggested first slice: pending rank approval Admin queue, starting with schema/RPC/service behavior before UI.
-   - Next command can be: `Run the first Sprint 6 Admin Ops slice from docs/plans/06_admin_ops_notifications.md. Start with pending rank approval schema/RPC/service behavior before UI.`
+   - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, `docs/plans/06_admin_ops_notifications.md`, and `docs/plans/06_admin_ops_notifications_token_light_slices.md`.
+   - Sprint 6 is split into S6.1-S6.9 in `docs/plans/06_admin_ops_notifications_token_light_slices.md`.
+   - Suggested next slice: S6.4 Registration Lists And Export Core.
+   - Next command can be: `Run Sprint 6 slice S6.4 from docs/plans/06_admin_ops_notifications_token_light_slices.md.`
 2. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.
