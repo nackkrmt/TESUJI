@@ -86,6 +86,15 @@ This is the short, current-state handoff for agents switching between Codex and 
   - Creates one-time Referee invite codes stored only as salted hashes.
 - Referee invite redeem page exists at `/referee/invite` and calls `redeem_referee_invite`.
 - Referee invite revoke now exists through service-role-only RPC `revoke_referee_invite`; `/admin/roles` shows active/redeemed/expired/revoked invite status and only active invites expose a real Revoke action.
+- Admin registration list page exists at `/admin/registrations`:
+  - Reads real registrations through `src/lib/admin/registrations.ts`.
+  - Supports tournament selection, division filters, status filters, staff-safe table rows, and CSV download using the S6.4 export route.
+  - Adds the Admin sidebar/mobile nav item `Registrations`.
+- Admin user management read-only page exists at `/admin/users`:
+  - Reads real accounts, roles, pending Coach requests, Player Profile summaries, and Coach Link status counts through `src/lib/admin/users.ts`.
+  - Supports search, role filter, and limit controls.
+  - Adds the Admin sidebar/mobile nav item `Users`.
+  - It is read-only and intentionally excludes identity/national ID/document hashes and private payment slip fields from DTOs and rendered UI.
 - Migration `202606020001_role_management.sql` has been pushed to the real Supabase project.
 - Coach/Profile link flow exists at `/profile`:
   - `coach_player_links` stores Coach-to-Player relationships.
@@ -176,6 +185,23 @@ Test emails were `codex-e2e-...@example.com`.
   - Shows player name, declared rank, power level, institute, created time, and account contact context.
   - Client controls call the real S6.1 `approvePendingRank()` service through server actions for approve-as-is and edit-rank-then-approve.
   - Uses the existing self-declared rank option set for edits and keeps route-level Admin protection deferred in dev mode.
+- `/admin/registrations`
+  - Server page listing real registration rows by selected tournament, optional division, and optional registration status filter.
+  - Includes tournament selector, division filter links, status filter links, staff-safe registration table, and empty states for no tournaments, no divisions, and no registrations in the current scope.
+  - Download CSV action points at the matching `/admin/registrations/export.csv` query for the current tournament/division/status scope.
+  - Keeps route-level Admin protection deferred in dev mode.
+- `/admin/registrations/export.csv`
+  - Route handler that exports real registration rows as CSV for a selected `tournamentId` and optional `divisionId` / `status` filters.
+  - Backed by `src/lib/admin/registrations.ts`.
+  - Export includes order number, tournament/division, player TH/EN name, rank, power level, institute, registration status/time/source, and registered-by email/name/role context.
+  - Export intentionally excludes document hashes, national ID/passport hashes, private slip URLs/storage paths, and other sensitive fields not needed by tournament staff.
+- `/admin/users`
+  - Server page listing real `accounts` with role badges, active role, Player Profile summary, pending Coach role requests, and Coach Link counts as Coach/as Player.
+  - Supports `q`, `role`, and `limit` query params for search/filtering.
+  - Backed by `src/lib/admin/users.ts`.
+  - Read-only only: no destructive user actions were added in S6.6.
+  - Keeps route-level Admin protection deferred in dev mode.
+  - DTOs and page output intentionally exclude document hashes, national ID/passport hashes, and private payment slip fields.
 - `/referee/invite`
   - Logged-in users can redeem a one-time Referee invite code.
 - `/tournaments`
@@ -238,6 +264,19 @@ Test emails were `codex-e2e-...@example.com`.
   - Referee invite raw codes are still generated only in the server action response, stored only as salted hashes, and not readable after page reload.
   - `/admin` now reads lightweight counts for `payment_orders.status = pending_verify`, `player_profiles.rank_status = pending`, pending Coach requests, and Referee invite status buckets.
   - `/admin/roles` shows active/redeemed/expired/revoked invite status. Expired display includes unused rows whose `expires_at` is in the past even before an attempted redemption marks them `expired`.
+- Sprint 6 S6.4 adds Admin registration list/export core:
+  - No migration was needed.
+  - Service wrapper `src/lib/admin/registrations.ts` reads real registrations by tournament/division/status through the service role and keeps a future Admin read seam documented in code.
+  - CSV export is available through `exportAdminRegistrationCsv()` and GET `/admin/registrations/export.csv?tournamentId=...&divisionId=...`.
+  - Service/export only selects staff-safe columns and does not select identity/document hashes or private slip fields.
+- Sprint 6 S6.5 adds Admin registration list/export UI:
+  - `/admin/registrations` is a server-rendered Admin page using async `searchParams` for tournament/division/status filtering.
+  - The page reuses the S6.4 staff-safe DTO/export route, adds a `Registrations` Admin navigation item, and keeps dev-mode route-level Admin protection deferred.
+- Sprint 6 S6.6 adds Admin user management read-only UI:
+  - No migration was needed.
+  - Service wrapper `src/lib/admin/users.ts` reads real accounts, `account_roles`, `role_requests`, Player Profile summaries, and `coach_player_links` status counts with the service role.
+  - `/admin/users` is server-rendered, supports search/role/limit filters, adds a `Users` Admin navigation item, and keeps dev-mode route-level Admin protection deferred.
+  - The service/page only select staff-safe account/profile/role/link fields and do not select or render identity document hashes, national ID/passport hashes, private slip URLs/storage paths, or payment slip fields.
 
 ## Dev Tooling
 
@@ -525,11 +564,63 @@ Verified on 2026-06-11 (Asia/Bangkok):
 - Smoke auth users, tournament/payment rows, and the UI-created invite row were deleted; follow-up checks found 0 remaining smoke accounts/tournaments/invite rows.
 - `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin`, `/admin/payments`, `/admin/ranks`, and `/admin/roles`.
 
+## Sprint 6 Registration Lists And Export Core
+
+Verified on 2026-06-11 (Asia/Bangkok):
+
+- Added `src/lib/admin/registrations.ts` for real Supabase-backed Admin registration lists by tournament, optional division, and optional registration status filters.
+- Added GET `/admin/registrations/export.csv` for CSV download with `tournamentId`, optional `divisionId`, and optional repeated or comma-separated `status` query params.
+- Export rows include order number, tournament/division, player TH/EN name, rank, power level, institute, status, registered time, source, and registered-by email/name/role context.
+- Sensitive fields are excluded from the DTO and CSV: no identity/document hashes, no national ID/passport hash fields, and no private slip URL/storage path fields are selected.
+- Live DB smoke created temporary `codex-s64-...@example.com` player/coach/coached-player accounts, an approved Coach link, a tournament/division, one self registration, and one Coach registration. It verified:
+  - Service list returned both real rows for the smoke division.
+  - Self registration mapped registered-by role to `player`; Coach registration mapped registered-by role to `coach`.
+  - CSV contained the real rows and source/status values.
+  - Route handler returned `200` with `text/csv` and attachment headers.
+  - CSV content did not include forbidden tokens such as `identity_document_hash`, `national_id_hash`, `document_hash`, `slip_url`, `slip_storage_path`, or the inserted `hash-...` values.
+- Smoke data was deleted; follow-up checks found 0 remaining smoke accounts/tournaments.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin/registrations/export.csv`.
+
+## Sprint 6 Registration Lists And Export UI
+
+Verified on 2026-06-11 (Asia/Bangkok):
+
+- Added `/admin/registrations` with real Supabase-backed tournament selection, division filters, status filters, staff-safe registration table rows, CSV download action, and empty states for no tournaments, no divisions, and no registrations.
+- Added the Admin navigation item `Registrations`.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100` and temporary `codex-s65-...@example.com` auth users/accounts/profiles, approved Coach link, tournament, two divisions, and two registrations:
+  - Initial list rendered both real rows: one `confirmed` self registration and one `waiting_list` Coach registration.
+  - Status filter `waiting_list` rendered only the Coach row.
+  - Division filter rendered only the matching division row.
+  - Admin nav contained `Registrations`; page console logs had no app warnings/errors.
+- CSV route smoke fetched `/admin/registrations/export.csv?tournamentId=...` over local HTTP and verified `200`, `text/csv; charset=utf-8`, attachment `Content-Disposition`, both real rows/statuses/source emails, and no forbidden tokens such as `identity_document_hash`, `national_id_hash`, `document_hash`, `slip_url`, `slip_storage_path`, or inserted `hash-codex-s65...` values.
+- Smoke data was deleted; follow-up checks found 0 remaining smoke accounts/tournaments/registrations.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin/registrations` and `/admin/registrations/export.csv`.
+
+## Sprint 6 Admin User Management Read-Only
+
+Verified on 2026-06-11 (Asia/Bangkok):
+
+- Added `src/lib/admin/users.ts` for real Supabase-backed account list/search with roles, pending Coach role requests, Player Profile summaries, and Coach Link status counts.
+- Added `/admin/users` with search, role filter, result limit, read-only staff table, and empty/migration states.
+- Added the Admin navigation item `Users`.
+- Service smoke used temporary `codex-s66-...@example.com` auth users/accounts/profiles plus Coach Link rows and verified:
+  - Account search returned all three smoke accounts.
+  - Role filter `coach` returned only the active Coach account.
+  - Player Profile summaries, pending Coach role request status, and Coach Link counts mapped correctly.
+  - Serialized DTOs did not include forbidden tokens such as `identity_document_hash`, `national_id_hash`, `document_hash`, `slip_url`, `slip_storage_path`, `payment_slip`, or inserted `hash-codex-s66...` values.
+- Browser smoke used local Next dev server at `http://127.0.0.1:3100` and temporary `codex-s66-ui-...@example.com` auth users/accounts/profiles plus Coach Link rows:
+  - `/admin/users?q=...` rendered 3 real user rows and preserved search/filter controls.
+  - `/admin/users?q=...&role=coach` rendered only the active Coach account.
+  - Admin nav contained `Users`; page console logs had no app warnings/errors.
+  - Rendered page text did not include forbidden hash/slip tokens.
+- Smoke auth users were deleted; follow-up checks found 0 remaining S6.6 smoke account rows.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin/users`.
+
 ## Recommended Next Task
 
 1. Continue to Sprint 6 Admin Operations And Notifications.
    - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, `docs/plans/06_admin_ops_notifications.md`, and `docs/plans/06_admin_ops_notifications_token_light_slices.md`.
    - Sprint 6 is split into S6.1-S6.9 in `docs/plans/06_admin_ops_notifications_token_light_slices.md`.
-   - Suggested next slice: S6.4 Registration Lists And Export Core.
-   - Next command can be: `Run Sprint 6 slice S6.4 from docs/plans/06_admin_ops_notifications_token_light_slices.md.`
+   - Suggested next slice: S6.7 Manual Notifications Core.
+   - Next command can be: `Run Sprint 6 slice S6.7 from docs/plans/06_admin_ops_notifications_token_light_slices.md.`
 2. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.
