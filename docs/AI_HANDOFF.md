@@ -1,6 +1,6 @@
 # TESUJI AI Handoff
 
-Last updated: 2026-06-11
+Last updated: 2026-06-12
 
 This is the short, current-state handoff for agents switching between Codex and Claude.
 
@@ -38,6 +38,8 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `payment_orders`
   - `registrations`
   - `promo_code_usages`
+  - `manual_notifications`
+  - `manual_notification_recipients`
 - Current migrations:
   - `202606010001_go_player_database.sql`
   - `202606010002_replace_go_player_database_source.sql`
@@ -63,6 +65,7 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606090002_repair_division_sort_order_drift.sql`
   - `202606100001_pending_rank_approval.sql`
   - `202606110001_referee_invite_revoke.sql`
+  - `202606120001_manual_notifications.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
 
 ## Implemented Features
@@ -95,6 +98,11 @@ This is the short, current-state handoff for agents switching between Codex and 
   - Supports search, role filter, and limit controls.
   - Adds the Admin sidebar/mobile nav item `Users`.
   - It is read-only and intentionally excludes identity/national ID/document hashes and private payment slip fields from DTOs and rendered UI.
+- Manual notification core exists with no UI yet:
+  - `manual_notifications` stores Admin-authored messages with optional safe link URL and audience metadata.
+  - `manual_notification_recipients` stores per-account delivery/read state.
+  - `src/lib/admin/notifications.ts` sends manual notifications through service-role-only RPC `create_manual_notification`.
+  - `src/lib/notifications/user-notifications.ts` lists current-user notifications, returns unread count, and marks the current user's recipient row read through RLS.
 - Migration `202606020001_role_management.sql` has been pushed to the real Supabase project.
 - Coach/Profile link flow exists at `/profile`:
   - `coach_player_links` stores Coach-to-Player relationships.
@@ -277,6 +285,13 @@ Test emails were `codex-e2e-...@example.com`.
   - Service wrapper `src/lib/admin/users.ts` reads real accounts, `account_roles`, `role_requests`, Player Profile summaries, and `coach_player_links` status counts with the service role.
   - `/admin/users` is server-rendered, supports search/role/limit filters, adds a `Users` Admin navigation item, and keeps dev-mode route-level Admin protection deferred.
   - The service/page only select staff-safe account/profile/role/link fields and do not select or render identity document hashes, national ID/passport hashes, private slip URLs/storage paths, or payment slip fields.
+- Sprint 6 S6.7 adds manual notification core:
+  - Migration `202606120001_manual_notifications.sql` creates `manual_notifications` and `manual_notification_recipients`, indexes account unread lookups, and enables RLS.
+  - `create_manual_notification(p_title, p_body, p_audience_type, p_tournament_id, p_account_ids, p_link_url, p_admin_account_id)` is service-role-only and creates the notification plus deduped recipient rows in one transaction.
+  - Supported recipient modes are all accounts, accounts related to non-cancelled/non-expired/non-rejected registrations in a selected tournament, and selected account IDs.
+  - Tournament recipient mode includes both the registered Player Profile owner and `registered_by_account_id`, then dedupes.
+  - User notification reads/mark-read go through authenticated RLS; users can select/update only their own recipient rows. Dev-mode Admin sender still passes `null` for `p_admin_account_id`.
+  - No automatic notifications and no notification UI were added in S6.7.
 
 ## Dev Tooling
 
@@ -616,11 +631,30 @@ Verified on 2026-06-11 (Asia/Bangkok):
 - Smoke auth users were deleted; follow-up checks found 0 remaining S6.6 smoke account rows.
 - `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin/users`.
 
+## Sprint 6 Manual Notifications Core
+
+Verified on 2026-06-12 (Asia/Bangkok):
+
+- Added and pushed `202606120001_manual_notifications.sql` to the linked Supabase project.
+- Added `manual_notifications`, `manual_notification_recipients`, RLS policies, indexes, and service-role-only RPC `create_manual_notification`.
+- Added `src/lib/admin/notifications.ts` for Admin manual-send service behavior with future Admin actor seam.
+- Added `src/lib/notifications/user-notifications.ts` for current-user notification list, unread count, and mark-read behavior through authenticated RLS.
+- `npx.cmd supabase db push --linked --yes` applied the migration.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- Live DB smoke created temporary `codex-s67-...@example.com` auth users/accounts/profiles, one tournament/division, and two registrations. It verified:
+  - selected-account send deduped duplicate account IDs and created exactly 2 recipient rows.
+  - tournament-recipient send created exactly 3 recipient rows: self-registered player, Coach registered-by account, and coached player account.
+  - all-accounts send created exactly the current account count (`7` during smoke).
+  - current-user list/unread services returned only each user's visible notifications.
+  - mark-read updated only the logged-in user's recipient row; another user could not read or mark the selected notification recipient row.
+- Smoke notifications, tournament, and auth users were deleted; follow-up checks found 0 remaining S6.7 smoke account/tournament/notification rows.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed.
+
 ## Recommended Next Task
 
 1. Continue to Sprint 6 Admin Operations And Notifications.
    - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, `docs/plans/06_admin_ops_notifications.md`, and `docs/plans/06_admin_ops_notifications_token_light_slices.md`.
    - Sprint 6 is split into S6.1-S6.9 in `docs/plans/06_admin_ops_notifications_token_light_slices.md`.
-   - Suggested next slice: S6.7 Manual Notifications Core.
-   - Next command can be: `Run Sprint 6 slice S6.7 from docs/plans/06_admin_ops_notifications_token_light_slices.md.`
+   - Suggested next slice: S6.8 Manual Notifications UI.
+   - Next command can be: `Run Sprint 6 slice S6.8 from docs/plans/06_admin_ops_notifications_token_light_slices.md.`
 2. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.
