@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ListChecks, LogOut, ShieldCheck, Trophy, UserRound } from "lucide-react";
+import { BellRing, ListChecks, LogOut, ShieldCheck, Trophy, UserRound } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { DigitalIdCard } from "@/components/home/digital-id-card";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { getCurrentAccount } from "@/lib/auth/current-account";
 import { getCoachLinkDashboard } from "@/lib/coach/links";
 import { createDigitalIdQrDataUrl } from "@/lib/digital-id/qr";
+import { getMyUnreadNotificationCount } from "@/lib/notifications/user-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,10 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const [coachLinks, qrDataUrl] = await Promise.all([
+  const [coachLinks, qrDataUrl, unreadNotificationCount] = await Promise.all([
     getCoachLinkDashboard(account),
     createDigitalIdQrDataUrl(account),
+    getMyUnreadNotificationCount(),
   ]);
   const activeRoles = account.roles.filter((role) => role.status === "active");
   const isActiveAdmin = activeRoles.some((role) => role.role === "admin");
@@ -41,7 +43,26 @@ export default async function Home() {
   const approvedLinkedPlayers = coachLinks.coachLinks.filter(
     (link) => link.status === "approved" && link.player,
   );
-  const quickActions = [
+  const quickActions: Array<{
+    badge?: string;
+    description: string;
+    href: string;
+    icon: ReactNode;
+    label: string;
+  }> = [
+    {
+      badge:
+        unreadNotificationCount > 0
+          ? unreadNotificationCount.toLocaleString("th-TH")
+          : undefined,
+      description:
+        unreadNotificationCount > 0
+          ? `${unreadNotificationCount.toLocaleString("th-TH")} unread Admin message(s)`
+          : "Admin messages and tournament follow-up",
+      href: "/notifications",
+      icon: <BellRing className="h-5 w-5" aria-hidden />,
+      label: "Notifications",
+    },
     {
       description:
         incomingPendingCount > 0
@@ -116,6 +137,7 @@ export default async function Home() {
             {quickActions.map((action) => (
               <QuickActionTile
                 key={`${action.href}-${action.label}`}
+                badge={action.badge}
                 description={action.description}
                 href={action.href}
                 icon={action.icon}
@@ -213,11 +235,13 @@ export default async function Home() {
 }
 
 function QuickActionTile({
+  badge,
   description,
   href,
   icon,
   label,
 }: {
+  badge?: string;
   description: string;
   href: string;
   icon: ReactNode;
@@ -237,7 +261,14 @@ function QuickActionTile({
         </span>
       </span>
       <span>
-        <span className="block text-sm font-semibold text-white">{label}</span>
+        <span className="flex items-center gap-2">
+          <span className="min-w-0 truncate text-sm font-semibold text-white">{label}</span>
+          {badge ? (
+            <span className="shrink-0 rounded-full bg-[#6c72ff] px-2 py-0.5 text-xs font-semibold text-white">
+              {badge}
+            </span>
+          ) : null}
+        </span>
         <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[#8390bd]">
           {description}
         </span>

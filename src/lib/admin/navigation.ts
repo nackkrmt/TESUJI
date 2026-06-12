@@ -1,5 +1,6 @@
 import {
   BadgeCheck,
+  BellRing,
   ClipboardList,
   CreditCard,
   Database,
@@ -59,6 +60,12 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Users",
     description: "Accounts / profiles / roles",
     icon: UserCog,
+  },
+  {
+    href: "/admin/notifications",
+    label: "Notifications",
+    description: "Manual sends / user inbox",
+    icon: BellRing,
   },
   {
     href: "/admin/roles",

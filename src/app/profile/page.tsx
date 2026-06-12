@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowLeft, BellRing, ShieldCheck, UserRound } from "lucide-react";
 import { CoachLinkPanel } from "@/components/profile/coach-link-panel";
 import { PlayerCoachRequests } from "@/components/profile/player-coach-requests";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { getCurrentAccount } from "@/lib/auth/current-account";
 import { getCoachLinkDashboard } from "@/lib/coach/links";
+import { getMyUnreadNotificationCount } from "@/lib/notifications/user-notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +18,10 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  const [coachLinks, hasPendingCoachRequest] = await Promise.all([
+  const [coachLinks, hasPendingCoachRequest, unreadNotificationCount] = await Promise.all([
     getCoachLinkDashboard(account),
     getHasPendingCoachRequest(account.userId),
+    getMyUnreadNotificationCount(),
   ]);
   const isActiveCoach = account.roles.some(
     (role) => role.role === "coach" && role.status === "active",
@@ -34,6 +36,19 @@ export default async function ProfilePage() {
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
           กลับหน้าแรก
+        </Link>
+
+        <Link
+          href="/notifications"
+          className="flex min-h-12 items-center justify-between gap-3 rounded-md border border-[#27345b] bg-[#101832] px-4 py-3 text-sm font-semibold text-[#dce3ff] transition hover:border-[#6c72ff] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c72ff]/60"
+        >
+          <span className="inline-flex items-center gap-2">
+            <BellRing className="h-4 w-4 text-[#8c91ff]" aria-hidden />
+            Notifications
+          </span>
+          <span className="rounded-full bg-[#20255d] px-2.5 py-1 text-xs font-semibold text-[#8c91ff]">
+            {unreadNotificationCount.toLocaleString("th-TH")} unread
+          </span>
         </Link>
 
         <section className="rounded-md border border-[#27345b] bg-[#101832] p-5">

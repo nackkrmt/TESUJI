@@ -1,6 +1,6 @@
 # TESUJI AI Handoff
 
-Last updated: 2026-06-12
+Last updated: 2026-06-13
 
 This is the short, current-state handoff for agents switching between Codex and Claude.
 
@@ -16,7 +16,7 @@ This is the short, current-state handoff for agents switching between Codex and 
 
 ## Current State
 
-- Next.js app exists at `D:/Programming/TESUJI`.
+- Next.js app exists at `E:/Programming/TESUJI`.
 - Supabase project is linked/authenticated through CLI/MCP.
 - Real Supabase project:
   - ref: `jiweobnsxpmgexipqzbx`
@@ -30,6 +30,7 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `role_requests`
   - `player_profiles`
   - `coach_player_links`
+  - `referee_invite_codes`
   - `school_database`
   - `database_import_runs`
   - `tournaments`
@@ -67,6 +68,10 @@ This is the short, current-state handoff for agents switching between Codex and 
   - `202606110001_referee_invite_revoke.sql`
   - `202606120001_manual_notifications.sql`
 - Supabase MCP is configured for dev DB access via project-scoped `.mcp.json` (OAuth, no secret key). Run `/mcp` -> `supabase` -> Authenticate after a fresh session.
+- Supabase data was intentionally wiped on 2026-06-13 (Asia/Bangkok) at user request while keeping schema, RPCs, policies, and Storage buckets:
+  - Verified 0 rows in all listed public tables, `auth.users`, `auth.identities`, `auth.sessions`, `auth.refresh_tokens`, and `storage.objects`.
+  - Removed 1 object from the `tournament-banners` bucket; `slips` was already empty.
+  - Local dev server was started at `http://127.0.0.1:3000` after the wipe.
 
 ## Implemented Features
 
@@ -76,11 +81,8 @@ This is the short, current-state handoff for agents switching between Codex and 
 - Go DB upload now re-syncs already verified Player Profiles after each import. Verified profiles are rematched by normalized Thai first/last name against the current `go_player_database`, with DAN priority over KYU/AWARD and then highest `power_level`; matching rows update `rank`, `power_level`, `rating`, and `matched_go_player_id`.
 - Admin Database upload also supports `SCHOOL_Database.xlsx` with columns `seq`, `name`, `keywords`; it imports directly from the uploaded file bytes to `school_database`.
 - Go and school database production paths are upload-only and must not depend on a fixed local folder. Latest upload status lives in `database_import_runs`, not `.tesuji-upload-status.json`.
-- `go_player_database` currently has 3,762 rows:
-  - DAN: 1,142
-  - KYU: 1,635
-  - AWARD: 985
-- `school_database` currently has 3 rows from the latest Admin upload.
+- `go_player_database` currently has 0 rows after the 2026-06-13 wipe; re-upload DAN/KYU/AWARD files through `/admin/database` when rank search data is needed.
+- `school_database` currently has 0 rows after the 2026-06-13 wipe; re-upload `SCHOOL_Database.xlsx` through `/admin/database` when school autocomplete data is needed.
 - Rank search API exists at `POST /api/rank/search`.
 - School search API exists at `GET /api/schools/search?q=...`.
 - Admin role-management page exists at `/admin/roles`:
@@ -98,11 +100,14 @@ This is the short, current-state handoff for agents switching between Codex and 
   - Supports search, role filter, and limit controls.
   - Adds the Admin sidebar/mobile nav item `Users`.
   - It is read-only and intentionally excludes identity/national ID/document hashes and private payment slip fields from DTOs and rendered UI.
-- Manual notification core exists with no UI yet:
+- Manual notifications now have Admin and user UI:
   - `manual_notifications` stores Admin-authored messages with optional safe link URL and audience metadata.
   - `manual_notification_recipients` stores per-account delivery/read state.
-  - `src/lib/admin/notifications.ts` sends manual notifications through service-role-only RPC `create_manual_notification`.
+  - `src/lib/admin/notifications.ts` sends manual notifications through service-role-only RPC `create_manual_notification` and provides Admin page read models for account search, tournament recipient preview counts, and recent sends.
   - `src/lib/notifications/user-notifications.ts` lists current-user notifications, returns unread count, and marks the current user's recipient row read through RLS.
+  - `/admin/notifications` lets Admin compose manual notifications for all accounts, tournament registrants, or selected account IDs.
+  - `/notifications` is the mobile-frame user inbox with mark-read behavior.
+  - Home Quick Access and `/profile` show notification entry points with unread counts.
 - Migration `202606020001_role_management.sql` has been pushed to the real Supabase project.
 - Coach/Profile link flow exists at `/profile`:
   - `coach_player_links` stores Coach-to-Player relationships.
@@ -210,6 +215,12 @@ Test emails were `codex-e2e-...@example.com`.
   - Read-only only: no destructive user actions were added in S6.6.
   - Keeps route-level Admin protection deferred in dev mode.
   - DTOs and page output intentionally exclude document hashes, national ID/passport hashes, and private payment slip fields.
+- `/admin/notifications`
+  - Server page with a client compose form for manual Admin notifications.
+  - Supports recipient modes `all_accounts`, `tournament_registrants`, and `selected_accounts`.
+  - Shows all-account count, per-tournament recipient preview counts, safe account search, selected account checkboxes/pasted UUIDs, optional link, and recent manual sends with read/unread totals.
+  - Sends through `sendManualNotificationAction()` and service-role-only RPC `create_manual_notification`; no automatic workflow notifications were added.
+  - Keeps route-level Admin protection deferred in dev mode.
 - `/referee/invite`
   - Logged-in users can redeem a one-time Referee invite code.
 - `/tournaments`
@@ -235,11 +246,15 @@ Test emails were `codex-e2e-...@example.com`.
   - Logged-in users see Player Profile, roles, incoming Coach Link requests, and Coach tools.
   - Active Coach users can search existing Player accounts and request a link.
   - Player owners approve/reject Coach Link requests.
+- `/notifications`
+  - Mobile-frame authenticated inbox for manual Admin notifications.
+  - Lists current-user recipient rows through RLS, shows unread/read state, opens optional safe links, and marks the current user's notification recipient row read.
+  - `/` Quick Access and `/profile` include unread-count notification entry points.
 - Authenticated Home/Digital ID functional skeleton exists at `/`:
   - Uses the real logged-in account, Player Profile, roles, and Coach Link data.
   - Generates a real QR code from a non-secret Digital ID payload using `qrcode`.
   - QR expands in a full-screen overlay.
-  - Quick Access points only at existing real routes.
+  - Quick Access points only at existing real routes, now including `/notifications`.
   - Active Coach users see approved linked players from `coach_player_links`.
   - Tournament Snapshot links to the real `/tournaments` route.
 
@@ -292,6 +307,12 @@ Test emails were `codex-e2e-...@example.com`.
   - Tournament recipient mode includes both the registered Player Profile owner and `registered_by_account_id`, then dedupes.
   - User notification reads/mark-read go through authenticated RLS; users can select/update only their own recipient rows. Dev-mode Admin sender still passes `null` for `p_admin_account_id`.
   - No automatic notifications and no notification UI were added in S6.7.
+- Sprint 6 S6.8 adds manual notification UI:
+  - No migration was needed.
+  - `/admin/notifications` uses real Admin read models from `src/lib/admin/notifications.ts`; explicit tournament selects use current `tournaments.title/title_en` columns, not removed `title_th`.
+  - Admin selected-account sends combine checked search results and pasted UUIDs, then dedupe/validate before calling `create_manual_notification`.
+  - `/notifications` uses `src/lib/notifications/user-notifications.ts` and authenticated RLS for inbox reads and mark-read updates.
+  - Home and Profile read unread counts with the current user's Supabase session and link to `/notifications`.
 
 ## Dev Tooling
 
@@ -650,11 +671,59 @@ Verified on 2026-06-12 (Asia/Bangkok):
 - Smoke notifications, tournament, and auth users were deleted; follow-up checks found 0 remaining S6.7 smoke account/tournament/notification rows.
 - `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed.
 
+## Sprint 6 Manual Notifications UI
+
+Verified on 2026-06-12 (Asia/Bangkok):
+
+- Added `/admin/notifications` with real Supabase-backed Admin compose UI for all accounts, tournament registrants, and selected account IDs.
+- Added `src/app/admin/notifications/actions.ts` and `manual-notification-form.tsx` on top of the S6.7 service/RPC.
+- Extended `src/lib/admin/notifications.ts` with Admin page state: all-account count, account search options, per-tournament recipient preview counts, and recent send summaries.
+- Added `/notifications` mobile-frame user inbox and `mark-notification-read-button.tsx` on top of `src/lib/notifications/user-notifications.ts`.
+- Added unread-count entry points on authenticated Home Quick Access and `/profile`.
+- Added the Admin navigation item `Notifications`.
+- Fixed the new notification Admin state to read current tournament columns (`title`, `title_en`) without selecting removed `title_th`.
+- Live DB smoke created temporary `codex-s68-...@example.com` auth users/accounts/profiles and a tournament with registrations. It verified:
+  - selected-account send deduped duplicate account IDs and created exactly 2 recipient rows.
+  - tournament-recipient preview and send resolved exactly 3 recipients: self-registered player, Coach registered-by account, and coached player account.
+  - all-account send created the current account count (`7` during smoke), then the notification row was deleted.
+  - authenticated RLS let a Player see 3 relevant notifications and mark exactly their own selected notification recipient row read.
+- Headless Chrome/CDP browser smoke used local Next dev server at `http://127.0.0.1:3100`:
+  - Desktop `/admin/notifications?accountQ=...` rendered the smoke account and submitted the real selected-account compose form.
+  - Mobile `/notifications` rendered the UI-sent notification for the logged-in smoke user and mark-read updated `read_at`; reload showed read state.
+  - No relevant console errors were observed.
+- Smoke notifications, tournament rows, auth users, and temporary Chrome profile directories were deleted; follow-up checks found 0 remaining S6.8 smoke account/tournament/notification rows.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed. Build lists `/admin/notifications` and `/notifications`.
+
+## Sprint 6 End-To-End Smoke And Handoff
+
+Verified on 2026-06-12 (Asia/Bangkok):
+
+- Live DB smoke created temporary `codex-s69-...@example.com` auth users/accounts/profiles, a tournament/divisions, payment orders/registrations, referee invites, and a manual notification. It verified:
+  - pending rank approve-as-is changed `15 Kyu` to verified.
+  - pending rank edit-and-approve changed `10 Kyu` to `1 Dan` and recalculated `power_level = 17`.
+  - Coach approval via `review_coach_request` granted active `account_roles.coach`.
+  - Referee invite create/revoke prevented redemption of the revoked code, and a separate valid invite redeemed successfully and granted active `account_roles.referee`.
+  - registration CSV export returned 4 real rows and excluded forbidden tokens/fields including identity/document hashes, slip fields, and inserted `hash-codex-s69...` values.
+  - payment queue review confirmed one pending verification order, returned one order/registration to `pending_payment`, and cancelled one order/registration.
+  - manual notification selected send created one recipient row, authenticated RLS exposed it to the user, and mark-read updated `read_at`.
+- Cleanup deleted smoke notifications, referee invites, tournament/payment/registration rows, and auth users; follow-up checks found 0 remaining S6.9 smoke accounts/tournaments/notifications/invites.
+- Headless Chrome/CDP browser smoke used local Next dev server at `http://127.0.0.1:3100`:
+  - Desktop routes rendered without app/runtime error UI: `/admin/payments`, `/admin/ranks`, `/admin/roles`, `/admin/registrations`, `/admin/users`, `/admin/notifications`.
+  - Mobile `/notifications` rendered a real manual notification for a logged-in smoke user.
+  - No relevant console errors were observed.
+- `npx.cmd supabase db lint --linked --schema public,storage --level error --fail-on error` passed.
+- `npm.cmd run lint`, `npx.cmd tsc --noEmit`, and `npm.cmd run build` passed.
+
+## Manual UAT Plan
+
+- `docs/TEST_PLAN_UAT.md` is an owner-run end-to-end manual UAT plan (288 cases across 9 suites: auth/register, profile/coach-link, tournament admin+public, registration, payment/slip/cancel/waiting-list, admin ops+referee, notifications, DB upload+search, home/digital-id). It includes env setup, `uat-` test-data + cleanup discipline, a test-account matrix, and a dependency-ordered execution order (Phase 0–10).
+- Generated from real code by the `tesuji-uat-plan` workflow. Source payload is saved at `scripts/uat-source.json`; regenerate the doc with `node scripts/gen-uat-plan.cjs`.
+- Appendix A (coverage gaps/extra cases) and Appendix B (per-suite code notes) flag several potential bugs/risks worth triaging before launch, e.g.: `src/lib/registrations/payment.ts` + `my-registrations.ts` select `title`/`title_en` but `TournamentRow`/`getTournamentTitle` reference `title_th` (verify the real `tournaments` columns); slip MIME check is `File.type`-based, not magic-byte (spoofable); `getMyUnreadNotificationCount()` has no explicit `account_id` filter and relies entirely on RLS; admin payment approve uses `z.coerce.number().int().positive()` for `updatedRegistrations` so a 0-update approve could Zod-throw after commit; PromptPay merchant name strips all non-ASCII so a Thai `promptpay_name` encodes as literal `TESUJI` in QR tag 59. These are observations from code reading, not yet reproduced — confirm during UAT.
+
 ## Recommended Next Task
 
-1. Continue to Sprint 6 Admin Operations And Notifications.
-   - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, `docs/plans/06_admin_ops_notifications.md`, and `docs/plans/06_admin_ops_notifications_token_light_slices.md`.
-   - Sprint 6 is split into S6.1-S6.9 in `docs/plans/06_admin_ops_notifications_token_light_slices.md`.
-   - Suggested next slice: S6.8 Manual Notifications UI.
-   - Next command can be: `Run Sprint 6 slice S6.8 from docs/plans/06_admin_ops_notifications_token_light_slices.md.`
+1. Continue to Sprint 7 Tournament Day And Realtime.
+   - Token-light starting set: `docs/AI_HANDOFF.md`, `docs/DECISIONS.md`, and `docs/plans/07_tournament_day_realtime.md`.
+   - Suggested first slice: schema/RPC foundation for tournament-day tables (`rounds`, `matches`, `standings`, `schedule_templates`) before UI.
+   - Next command can be: `Run the first Sprint 7 tournament-day schema/RPC slice from docs/plans/07_tournament_day_realtime.md.`
 2. Keep Admin routes unprotected in dev mode. Add only future-ready auth seams that will later check `account_roles.admin = active`.
